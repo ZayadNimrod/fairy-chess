@@ -1,4 +1,3 @@
-
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -76,11 +75,7 @@ pub fn parse_string(input: String) -> Option<Move> {
 
 fn parse_move(input: &mut Peekable<Chars>) -> Option<Move> {
     let r = parse_seq(input);
-    //TODO convert this into the map I'm using in parse_seq
-    match r {
-        None => None,
-        Some(ast) => Some(Move::Seq(Box::new(ast))),
-    }
+    r.map(|ast| Move::Seq(Box::new(ast)))
 }
 
 fn parse_seq(input: &mut Peekable<Chars>) -> Option<Seq> {
@@ -92,10 +87,7 @@ fn parse_seq(input: &mut Peekable<Chars>) -> Option<Seq> {
             Some('*') => {
                 input.next();
                 let rhs = parse_seq(input);
-                match rhs {
-                    Some(rast) => Some(Seq::Moves(ast, Box::new(rast))),
-                    None => None,
-                }
+                rhs.map(|rast| Seq::Moves(ast, Box::new(rast)))
             }
             _ => Some(Seq::Modded(ast)),
         },
@@ -108,10 +100,7 @@ fn parse_modded(input: &mut Peekable<Chars>) -> Option<Modded> {
     match lhs {
         Some(ast) => {
             let mut mods: Vec<Mod> = Vec::new();
-            while match input.peek() {
-                Some('|') | Some('/') | Some('-') | Some('^') => true,
-                _ => false,
-            } {
+            while matches!(input.peek(), Some('|') | Some('/') | Some('-') | Some('^')) {
                 let modifier = parse_mod(input)?;
                 mods.push(modifier);
             }
@@ -187,13 +176,13 @@ fn parse_option(input: &mut Peekable<Chars>) -> Option<PieceOption> {
             input.next();
             let mut moves: Vec<Move> = Vec::new();
             match input.peek() {
-                Some('}') => return Some(PieceOption::Options(moves)), //empty option
+                Some('}') => Some(PieceOption::Options(moves)), //empty option
                 Some(_) => {
                     //at least 1 option
                     moves.push(parse_move(input)?);
                     loop {
                         match input.next() {
-                            Some(',') => {moves.push(parse_move(input)?)},
+                            Some(',') => moves.push(parse_move(input)?),
                             Some('}') => return Some(PieceOption::Options(moves)),
                             _ => return None,
                         }
@@ -208,11 +197,11 @@ fn parse_option(input: &mut Peekable<Chars>) -> Option<PieceOption> {
             if input.next() != Some(')') {
                 return None;
             };
-            m.map(|ast| PieceOption::Move(ast))
+            m.map(PieceOption::Move)
         }
         _ => {
             let jump: Option<Jump> = parse_jump(input);
-            jump.map(|j| PieceOption::Jump(j))
+            jump.map(PieceOption::Jump)
         }
     }
 }
@@ -239,54 +228,25 @@ fn parse_jump(input: &mut Peekable<Chars>) -> Option<Jump> {
 }
 
 fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
-    //TODO there has to be a better way than this to parse integers!
-
-    let negative = match input.peek() {
+    let is_negative : bool = match input.peek() {
         Some('-') => {
             input.next();
             true
         }
         _ => false,
     };
-
-    /*
-        input.take_while(|x| match x {
-            '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '0' => true,
-            _ => false,
-        })
-        .fold(None::<i32>, |acc:Option<i32> , c:char| {Some(char_to_int(c) +10*acc.unwrap_or(0) )});
-    */
-
-    let mut chars = input.take_while(|x| match x {
-        '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => true,
-        _ => false,
-    }); //TODO: I'm doing a mutable JUST for the sake of the next line. That seems dumb to me, I should chnage that.
+    let mut chars = input
+        .take_while(|x| matches!(x, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')); //TODO: I'm doing a mutable JUST for the sake of the next line. That seems dumb to me, I should chnage that.
 
     if !chars.any(|_x| true) {
         return None;
     } //empty iterator returns false, this is checking if the iterator is empty.
 
-    let abs = chars.fold(0, |acc, c| char_to_int(c) + 10 * acc);
+    let abs:i32  = chars.collect::<String>().parse().ok()?;
 
-    if negative {
+    if is_negative {
         Some(-abs)
     } else {
         Some(abs)
-    }
-}
-
-fn char_to_int(c: char) -> i32 {
-    match c {
-        '0' => 0,
-        '1' => 1,
-        '2' => 2,
-        '3' => 3,
-        '4' => 4,
-        '5' => 5,
-        '6' => 6,
-        '7' => 7,
-        '8' => 8,
-        '9' => 9,
-        _ => panic!("char_to_int was called on a non-digit character"),
     }
 }

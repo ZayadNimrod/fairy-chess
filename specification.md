@@ -100,25 +100,27 @@ Jump    ::= [Int,Int]
 
 Option  ::= {OptionC}
             | Move
+            | Jump
+
 Seq     ::= Move * Move
+            | Repeat
+
+Repeat  ::= Option ^ Int
+            | Option ^ [Int..Int]
+            | Option ^ [Int..*]
             | Option
 
-Repeat  ::= Move ^ Int
-            | Move ^ [Int..Int]
-            | Move ^ [Int..*]
-
 Move    ::= (Move)
-            | Repeat
-            | Jump
+            | Seq
             | Move Mod
 
 Mod     ::= -
             | |
             | /
 
-
-OptionC ::= Option
+OptionC ::= Move
             | Move , OptionC
+```
 
 
 

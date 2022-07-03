@@ -1,13 +1,6 @@
-//use std::collections::Vec;
+
 use std::iter::Peekable;
 use std::str::Chars;
-
-use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while, take_while1};
-use nom::character::complete::char;
-use nom::multi::separated_list1;
-use nom::sequence::tuple;
-use nom::Parser;
 
 pub enum Mod {
     HorizontalMirror,
@@ -72,19 +65,6 @@ Move    ::=  Seq
 
 pub fn parse_string(input: String) -> Option<Move> {
     //TODO whitespace handling!
-    /*
-    //TODO these are constant, break them outwards
-    
-    let int = take_while1( |c| {c >= b'0' && c <= b'9'} ); //TODO get negatives
-    let piece_jump = tuple((char('['), int, int, char(']')));
-
-    let piece_move_mod = alt();
-    let piece_move_contents = alt((piece_seq,piece_move_mod));
-    let piece_move = alt((tuple((char('('),piece_move_contents,char(')'))),piece_move_contents ));
-
-
-    let parse = piece_move(input.as_bytes());
-    */
 
     let mut a = input.chars().peekable();
     let r = parse_move(&mut a);

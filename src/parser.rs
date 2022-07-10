@@ -1,9 +1,8 @@
 use std::iter::Peekable;
-use std::str::Chars;
 
 use peeking_take_while::PeekableExt;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Mod {
     HorizontalMirror,
     VerticalMirror,
@@ -13,35 +12,31 @@ pub enum Mod {
     ExponentiateInfinite(usize),     //lower bound of exponent
 }
 
-
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Move {
     Seq(Box<Seq>),
 }
 
-
-
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Modded {
     Modded(PieceOption, Vec<Mod>),
     One(PieceOption),
 }
 
-
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Seq {
     Moves(Modded, Box<Seq>),
     Modded(Modded),
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum PieceOption {
     Options(Vec<Move>),
     Move(Move),
     Jump(Jump),
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Jump {
     x: i32,
     y: i32,
@@ -75,8 +70,8 @@ Move    ::=  Seq
 */
 
 pub fn parse_string(input: &str) -> Option<Move> {
-    //TODO whitespace handling!
-    let mut a = input.chars().peekable(); //TODO a .drop(whitespace?)
+    //TODO also filter out tabs
+    let mut a = input.chars().filter(|x:&char|*x != ' ').peekable();
     let r = parse_move(&mut a);
     match a.next() {
         None => r,
@@ -84,12 +79,18 @@ pub fn parse_string(input: &str) -> Option<Move> {
     }
 }
 
-fn parse_move(input: &mut Peekable<Chars>) -> Option<Move> {
+fn parse_move<T>(input: &mut Peekable<T>) -> Option<Move>
+where
+    T: Iterator<Item = char>,
+{
     let r = parse_seq(input);
     r.map(|ast| Move::Seq(Box::new(ast)))
 }
 
-fn parse_seq(input: &mut Peekable<Chars>) -> Option<Seq> {
+fn parse_seq<T>(input: &mut Peekable<T>) -> Option<Seq>
+where
+    T: Iterator<Item = char>,
+{
     let lhs: Option<Modded> = parse_modded(input);
 
     match lhs {
@@ -105,7 +106,10 @@ fn parse_seq(input: &mut Peekable<Chars>) -> Option<Seq> {
     }
 }
 
-fn parse_modded(input: &mut Peekable<Chars>) -> Option<Modded> {
+fn parse_modded<T>(input: &mut Peekable<T>) -> Option<Modded>
+where
+    T: Iterator<Item = char>,
+{
     let lhs: Option<PieceOption> = parse_option(input);
 
     match lhs {
@@ -126,7 +130,10 @@ fn parse_modded(input: &mut Peekable<Chars>) -> Option<Modded> {
     }
 }
 
-fn parse_mod(input: &mut Peekable<Chars>) -> Option<Mod> {
+fn parse_mod<T>(input: &mut Peekable<T>) -> Option<Mod>
+where
+    T: Iterator<Item = char>,
+{
     match input.next() {
         Some('|') => Some(Mod::VerticalMirror),
         Some('/') => Some(Mod::DiagonalMirror),
@@ -136,7 +143,10 @@ fn parse_mod(input: &mut Peekable<Chars>) -> Option<Mod> {
     }
 }
 
-fn parse_exponentiation_modifier(input: &mut Peekable<Chars>) -> Option<Mod> {
+fn parse_exponentiation_modifier<T>(input: &mut Peekable<T>) -> Option<Mod>
+where
+    T: Iterator<Item = char>,
+{
     let f = input.peek()?;
     if *f == '[' {
         //this is a range
@@ -173,14 +183,20 @@ fn parse_exponentiation_modifier(input: &mut Peekable<Chars>) -> Option<Mod> {
     }
 }
 
-fn parse_usize(input: &mut Peekable<Chars>) -> Option<usize> {
+fn parse_usize<T>(input: &mut Peekable<T>) -> Option<usize>
+where
+    T: Iterator<Item = char>,
+{
     match parse_integer(input)?.try_into() {
         Ok(e) => Some(e),
         Err(_) => None,
     }
 }
 
-fn parse_option(input: &mut Peekable<Chars>) -> Option<PieceOption> {
+fn parse_option<T>(input: &mut Peekable<T>) -> Option<PieceOption>
+where
+    T: Iterator<Item = char>,
+{
     match input.peek() {
         Some('{') => {
             //parse options
@@ -217,19 +233,20 @@ fn parse_option(input: &mut Peekable<Chars>) -> Option<PieceOption> {
     }
 }
 
-fn parse_jump(input: &mut Peekable<Chars>) -> Option<Jump> {
+fn parse_jump<T>(input: &mut Peekable<T>) -> Option<Jump>
+where
+    T: Iterator<Item = char>,
+{
     if input.next() != Some('[') {
         return None;
     }
 
-    let first_int = parse_integer(input)?;    
+    let first_int = parse_integer(input)?;
     if input.next() != Some(',') {
         return None;
     }
 
     let second_int = parse_integer(input)?;
-
-    println!("{}",second_int);
     if input.next() != Some(']') {
         return None;
     }
@@ -240,7 +257,10 @@ fn parse_jump(input: &mut Peekable<Chars>) -> Option<Jump> {
     })
 }
 
-fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
+fn parse_integer<T>(input: &mut Peekable<T>) -> Option<i32>
+where
+    T: Iterator<Item = char>,
+{
     let is_negative: bool = match input.peek() {
         Some('-') => {
             input.next();
@@ -248,12 +268,12 @@ fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
         }
         _ => false,
     };
-    let mut chars = input
-        .peeking_take_while(|x| matches!(x, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'));
-        
+    let chars = input.peeking_take_while(|x| {
+        matches!(x, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')
+    });
 
     let s = chars.collect::<String>();
-    if s.len() == 0 {
+    if s.is_empty() {
         return None;
     }
     let abs: i32 = s.parse().ok()?;
@@ -265,7 +285,6 @@ fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::parser::parse_string;
@@ -274,5 +293,14 @@ mod tests {
     fn jumps() {
         let result = parse_string("[-3,2]");
         assert_ne!(result, None);
+    }
+
+    #[test]
+    fn options() {
+        let r1 = parse_string("{{[1,2],[2,1]},{[-1,2],[2,-1]},{[1,-2],[-2,1]},{[-1,-2],[-2,-1]}}");
+        let r2 = parse_string("{[1,2],[2,1 ], [-1,2],[2, -1],[1,-2], [-2,1],[-1,-2],[-2,-1]}");
+        assert_ne!(r1, None);
+        assert_ne!(r2, None);
+        //assert_eq(r1,r2); this is only after the deflator
     }
 }

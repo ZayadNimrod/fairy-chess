@@ -1,6 +1,9 @@
 use std::iter::Peekable;
 use std::str::Chars;
 
+use peeking_take_while::PeekableExt;
+
+#[derive(Debug,PartialEq)]
 pub enum Mod {
     HorizontalMirror,
     VerticalMirror,
@@ -10,26 +13,35 @@ pub enum Mod {
     ExponentiateInfinite(usize),     //lower bound of exponent
 }
 
+
+#[derive(Debug,PartialEq)]
 pub enum Move {
     Seq(Box<Seq>),
 }
 
+
+
+#[derive(Debug,PartialEq)]
 pub enum Modded {
     Modded(PieceOption, Vec<Mod>),
     One(PieceOption),
 }
 
+
+#[derive(Debug,PartialEq)]
 pub enum Seq {
     Moves(Modded, Box<Seq>),
     Modded(Modded),
 }
 
+#[derive(Debug,PartialEq)]
 pub enum PieceOption {
     Options(Vec<Move>),
     Move(Move),
     Jump(Jump),
 }
 
+#[derive(Debug,PartialEq)]
 pub struct Jump {
     x: i32,
     y: i32,
@@ -62,10 +74,9 @@ Move    ::=  Seq
 
 */
 
-pub fn parse_string(input: String) -> Option<Move> {
+pub fn parse_string(input: &str) -> Option<Move> {
     //TODO whitespace handling!
-
-    let mut a = input.chars().peekable();
+    let mut a = input.chars().peekable(); //TODO a .drop(whitespace?)
     let r = parse_move(&mut a);
     match a.next() {
         None => r,
@@ -211,12 +222,14 @@ fn parse_jump(input: &mut Peekable<Chars>) -> Option<Jump> {
         return None;
     }
 
-    let first_int = parse_integer(input)?;
+    let first_int = parse_integer(input)?;    
     if input.next() != Some(',') {
         return None;
     }
 
     let second_int = parse_integer(input)?;
+
+    println!("{}",second_int);
     if input.next() != Some(']') {
         return None;
     }
@@ -228,7 +241,7 @@ fn parse_jump(input: &mut Peekable<Chars>) -> Option<Jump> {
 }
 
 fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
-    let is_negative : bool = match input.peek() {
+    let is_negative: bool = match input.peek() {
         Some('-') => {
             input.next();
             true
@@ -236,17 +249,30 @@ fn parse_integer(input: &mut Peekable<Chars>) -> Option<i32> {
         _ => false,
     };
     let mut chars = input
-        .take_while(|x| matches!(x, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')); //TODO: I'm doing a mutable JUST for the sake of the next line. That seems dumb to me, I should chnage that.
+        .peeking_take_while(|x| matches!(x, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'));
+        
 
-    if !chars.any(|_x| true) {
+    let s = chars.collect::<String>();
+    if s.len() == 0 {
         return None;
-    } //empty iterator returns false, this is checking if the iterator is empty.
-
-    let abs:i32  = chars.collect::<String>().parse().ok()?;
+    }
+    let abs: i32 = s.parse().ok()?;
 
     if is_negative {
         Some(-abs)
     } else {
         Some(abs)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::parse_string;
+
+    #[test]
+    fn jumps() {
+        let result = parse_string("[-3,2]");
+        assert_ne!(result, None);
     }
 }

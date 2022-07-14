@@ -81,7 +81,7 @@ pub fn parse_string(input: &str) -> Option<Move> {
 
 fn parse_move<T>(input: &mut Peekable<T>) -> Option<Move>
 where
-    T: Iterator<Item = char>,
+    T: Iterator<Item = char>
 {
     let r = parse_seq(input);
     r.map(|ast| Move::Seq(Box::new(ast)))
@@ -303,4 +303,41 @@ mod tests {
         assert_ne!(r2, None);
         //assert_eq(r1,r2); this is only after the deflator
     }
+
+    #[test]
+    fn sequences(){
+        let result = parse_string("{[1,2],[2,1],[-1,2],[2,-1],[1,-2],[-2,1],[-1,-2],[-2,-1]} * [0,1]");
+        assert_ne!(result, None);
+    }
+    
+
+    #[test]
+     fn exponentiation(){
+        let r2 = parse_string("{[1,1]^4,[-1,1]^4,[1,-1]^4,[1,-1]^4}");
+        let r3 = parse_string("{[1,1],[-1,1],[1,-1],[-1,-1]}^4");
+        let r4 = parse_string("{[1,1]^[1..4],[-1,1]^[1..4],[1,-1]^[1..4],[1,-1]^[1..4]}");
+        let r5 = parse_string("{[1,1],[-1,1],[1,-1],[-1,-1]}^[1..4]");
+        let r1 = parse_string("{[1,1]^[1..*],[-1,1]^[1..*],[1,-1]^[1..*],[1,-1]^[1..*]}");
+        let r6 = parse_string("{[1,1]^*,[-1,1]^*,[1,-1]^*,[1,-1]^*}");//tests the syntactical sugar
+
+        assert_ne!(r1, None);
+        assert_ne!(r2, None);
+        assert_ne!(r3, None);
+        assert_ne!(r4, None);
+        assert_ne!(r5, None);
+        assert_ne!(r6, None);
+
+    }
+
+    #[test]
+    fn mirrors(){
+        let knight = parse_string("[2,1]/|-");
+        assert_ne!(knight,None);
+        let rook = parse_string ("[1,0]^*|-");
+        assert_ne!(rook, None);
+
+    }
 }
+
+
+//TODO syntaical sugar allowing ^ * to be = ^ [1..*]

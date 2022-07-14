@@ -62,7 +62,7 @@ Note that this is *not* the same as `{[1,1],[-1,1],[1,-1],[-1,-1]}^4`:
 We should also be able to input a range of values for eexponentiation. This would be done as `[x..y]`, where `x` and `y` are the upper and lower (inclusive) bounds. Exponentiating a move `m` in this way gives us the set of possible moves `{m^x,m^x+1,...m^y}`.
 
 ```
-{[1,1]^[1..4],[-1,1]^[1..4],[1,-1]^[1..4],[1-,-1]^[1..4]}
+{[1,1]^[1..4],[-1,1]^[1..4],[1,-1]^[1..4],[1,-1]^[1..4]}
 ```
 ![A second pseudo-bishop, that can move up 4 spaces in one diagonal. Note that it can capture at any distance within range, unlike the previous pseudo-bishop.](TODO)
 
@@ -75,12 +75,12 @@ As syntactical sugar, we can allow using the asterisk as an exponent outside of 
 
 
 ```
-{[1,1]^*,[-1,1]^*,[1,-1]^*,[1-,-1]^*}
+{[1,1]^*,[-1,1]^*,[1,-1]^*,[1,-1]^*}
 ```
 
 ![Finally, a true bishop!](TODO)
 
-Note the above makes use of the syntactical sugar; without it, it would be `{[1,1]^[1..*],[-1,1]^[1..*],[1,-1]^[1..*],[1-,-1]^[1..*]}`
+Note the above makes use of the syntactical sugar; without it, it would be `{[1,1]^[1..*],[-1,1]^[1..*],[1,-1]^[1..*],[1,-1]^[1..*]}`
 
 
 ### Mirrors
@@ -92,7 +92,7 @@ As a form of syntacal sugar, we will introduce mirror syntax. The first, `-`, th
 ![A rook, in a more compact syntax.](TODO)
 
 
-Next, we have the diagonal mirror, `/`. This swaps the x and y elements of the jump it is applied to. `[x,y]/` results in`[y,x]`. Otherwise, this follows the same rules as the other mirrors regarding sequences and options.
+Next, we have the diagonal mirror, `/`. This swaps the x and y elements of the jump it is applied to. `[x,y]/` results in`{[x,y][y,x]}`. Otherwise, this follows the same rules as the other mirrors regarding sequences and options.
 
 ## Formal Syntax
 ```
@@ -122,9 +122,3 @@ OptionC ::= Move
             | Move , OptionC
 ```
 
-
-
-
-
-
-```

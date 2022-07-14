@@ -71,7 +71,7 @@ Move    ::=  Seq
 
 pub fn parse_string(input: &str) -> Option<Move> {
     //TODO also filter out tabs
-    let mut a = input.chars().filter(|x:&char|*x != ' ').peekable();
+    let mut a = input.chars().filter(|x: &char| *x != ' ').peekable();
     let r = parse_move(&mut a);
     match a.next() {
         None => r,
@@ -81,7 +81,7 @@ pub fn parse_string(input: &str) -> Option<Move> {
 
 fn parse_move<T>(input: &mut Peekable<T>) -> Option<Move>
 where
-    T: Iterator<Item = char>
+    T: Iterator<Item = char>,
 {
     let r = parse_seq(input);
     r.map(|ast| Move::Seq(Box::new(ast)))
@@ -175,6 +175,10 @@ where
             }
             _ => None,
         }
+    } else if *f == '*' {
+        input.next();
+        //this is a single asterisk, signifying [1..*]
+        Some(Mod::ExponentiateInfinite(1))
     } else {
         //this is a single exponent
         let exp = parse_usize(input)?;
@@ -305,20 +309,20 @@ mod tests {
     }
 
     #[test]
-    fn sequences(){
-        let result = parse_string("{[1,2],[2,1],[-1,2],[2,-1],[1,-2],[-2,1],[-1,-2],[-2,-1]} * [0,1]");
+    fn sequences() {
+        let result =
+            parse_string("{[1,2],[2,1],[-1,2],[2,-1],[1,-2],[-2,1],[-1,-2],[-2,-1]} * [0,1]");
         assert_ne!(result, None);
     }
-    
 
     #[test]
-     fn exponentiation(){
+    fn exponentiation() {
         let r2 = parse_string("{[1,1]^4,[-1,1]^4,[1,-1]^4,[1,-1]^4}");
         let r3 = parse_string("{[1,1],[-1,1],[1,-1],[-1,-1]}^4");
         let r4 = parse_string("{[1,1]^[1..4],[-1,1]^[1..4],[1,-1]^[1..4],[1,-1]^[1..4]}");
         let r5 = parse_string("{[1,1],[-1,1],[1,-1],[-1,-1]}^[1..4]");
         let r1 = parse_string("{[1,1]^[1..*],[-1,1]^[1..*],[1,-1]^[1..*],[1,-1]^[1..*]}");
-        let r6 = parse_string("{[1,1]^*,[-1,1]^*,[1,-1]^*,[1,-1]^*}");//tests the syntactical sugar
+        let r6 = parse_string("{[1,1]^*,[-1,1]^*,[1,-1]^*,[1,-1]^*}"); //tests the syntactical sugar
 
         assert_ne!(r1, None);
         assert_ne!(r2, None);
@@ -326,18 +330,13 @@ mod tests {
         assert_ne!(r4, None);
         assert_ne!(r5, None);
         assert_ne!(r6, None);
-
     }
 
     #[test]
-    fn mirrors(){
+    fn mirrors() {
         let knight = parse_string("[2,1]/|-");
-        assert_ne!(knight,None);
-        let rook = parse_string ("[1,0]^*|-");
+        assert_ne!(knight, None);
+        let rook = parse_string("[1,0]^*|-");
         assert_ne!(rook, None);
-
     }
 }
-
-
-//TODO syntaical sugar allowing ^ * to be = ^ [1..*]

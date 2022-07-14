@@ -1,7 +1,5 @@
-pub mod parser;
-pub mod deflator;
-use deflator::Deflatable;
-
+mod parser;
+mod deflator;
 pub struct Piece{
 
 }

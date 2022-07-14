@@ -108,6 +108,7 @@ Seq     ::= Move * Move
 Repeat  ::= Option ^ Int
             | Option ^ [Int..Int]
             | Option ^ [Int..*]
+            | Option ^ *
             | Option
 
 Move    ::= (Move)
@@ -121,4 +122,3 @@ Mod     ::= -
 OptionC ::= Move
             | Move , OptionC
 ```
-

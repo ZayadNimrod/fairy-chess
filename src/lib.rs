@@ -1,5 +1,6 @@
 pub mod parser;
-
+pub mod deflator;
+use deflator::Deflatable;
 
 pub struct Piece{
 
@@ -15,7 +16,7 @@ pub fn check_move(p:Piece, b:Board, position:(usize,usize)) -> bool{
     todo!()
 } 
 
-pub fn convert_piece(s:&str) -> Piece{
-    let converted = parser::parse_string(s);
+pub fn convert_piece(s:&str) -> Option<Piece>{
+    let converted = parser::parse_string(s)?;
     todo!()
 }

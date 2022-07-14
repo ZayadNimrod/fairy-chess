@@ -2,6 +2,8 @@ use std::iter::Peekable;
 
 use peeking_take_while::PeekableExt;
 
+use crate::deflator::{Deflatable, Move};
+
 #[derive(Debug, PartialEq)]
 pub enum Mod {
     HorizontalMirror,
@@ -12,10 +14,11 @@ pub enum Mod {
     ExponentiateInfinite(usize),     //lower bound of exponent
 }
 
+/*
 #[derive(Debug, PartialEq)]
 pub enum Move {
     Seq(Box<Seq>),
-}
+}*/
 
 #[derive(Debug, PartialEq)]
 pub enum Modded {
@@ -31,15 +34,15 @@ pub enum Seq {
 
 #[derive(Debug, PartialEq)]
 pub enum PieceOption {
-    Options(Vec<Move>),
-    Move(Move),
+    Options(Vec<Seq>),
+    Move(Box<Seq>),
     Jump(Jump),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Jump {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 /*
 Jump    ::= [Int,Int]
@@ -72,19 +75,12 @@ Move    ::=  Seq
 pub fn parse_string(input: &str) -> Option<Move> {
     //TODO also filter out tabs
     let mut a = input.chars().filter(|x: &char| *x != ' ').peekable();
-    let r = parse_move(&mut a);
+    let r = parse_seq(&mut a);
     match a.next() {
         None => r,
         Some(_) => None, //check that the whole string was consumed.
     }
-}
-
-fn parse_move<T>(input: &mut Peekable<T>) -> Option<Move>
-where
-    T: Iterator<Item = char>,
-{
-    let r = parse_seq(input);
-    r.map(|ast| Move::Seq(Box::new(ast)))
+    .map(|x| x.deflate())
 }
 
 fn parse_seq<T>(input: &mut Peekable<T>) -> Option<Seq>
@@ -205,15 +201,15 @@ where
         Some('{') => {
             //parse options
             input.next();
-            let mut moves: Vec<Move> = Vec::new();
+            let mut moves: Vec<Seq> = Vec::new();
             match input.peek() {
                 Some('}') => Some(PieceOption::Options(moves)), //empty option
                 Some(_) => {
                     //at least 1 option
-                    moves.push(parse_move(input)?);
+                    moves.push(parse_seq(input)?);
                     loop {
                         match input.next() {
-                            Some(',') => moves.push(parse_move(input)?),
+                            Some(',') => moves.push(parse_seq(input)?),
                             Some('}') => return Some(PieceOption::Options(moves)),
                             _ => return None,
                         }
@@ -224,11 +220,11 @@ where
         }
         Some('(') => {
             input.next();
-            let m = parse_move(input);
+            let m = parse_seq(input);
             if input.next() != Some(')') {
                 return None;
             };
-            m.map(PieceOption::Move)
+            m.map(|x| PieceOption::Move(Box::new(x)))
         }
         _ => {
             let jump: Option<Jump> = parse_jump(input);
@@ -337,6 +333,7 @@ mod tests {
         let knight = parse_string("[2,1]/|-");
         assert_ne!(knight, None);
         let rook = parse_string("[1,0]^*|-");
+        //println!("{:#?}",rook);
         assert_ne!(rook, None);
     }
 }

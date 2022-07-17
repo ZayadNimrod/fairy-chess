@@ -302,6 +302,7 @@ mod tests {
         assert_ne!(r1, None);
         assert_ne!(r2, None);
         assert_eq!(r1,r2); 
+        
     }
 
     #[test]
@@ -309,6 +310,7 @@ mod tests {
         let result =
             parse_string("{[1,2],[2,1],[-1,2],[2,-1],[1,-2],[-2,1],[-1,-2],[-2,-1]} * [0,1]");
         assert_ne!(result, None);
+        assert_eq!(result.unwrap().notation(),"{[1,2],[2,1],[-1,2],[2,-1],[1,-2],[-2,1],[-1,-2],[-2,-1]}*[0,1]" )
     }
 
     #[test]
@@ -326,6 +328,9 @@ mod tests {
         assert_ne!(r4, None);
         assert_ne!(r5, None);
         assert_ne!(r6, None);
+        assert_eq!(r6,r1);
+
+        //TODO still need to verify that, for example, r4 and r5 are equal. This cannot be done in the deflator, however, as it requires unrolling.
     }
 
     #[test]

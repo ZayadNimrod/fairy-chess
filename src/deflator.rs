@@ -96,13 +96,12 @@ impl Deflatable for parser::PieceOption {
                 let choices = moves
                     .into_iter()
                     .map(|x| x.deflate())
-                    .map(|x| match x {
+                    .flat_map(|x| match x {
                         Move::Choice(c) => c,
                         _ => vec![x],
                     }) //unpack choices, i.e turn {{a,b},{c,d}} into {a,b,c,d}
-                    .flatten()
                     .collect();
-
+                    //TODO perhaps also deflate obviously mirrored items in a choice node?
                 Move::Choice(choices)
             }
         }

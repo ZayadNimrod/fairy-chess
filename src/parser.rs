@@ -301,7 +301,7 @@ mod tests {
         let r2 = parse_string("{[1,2],[2,1 ], [-1,2],[2, -1],[1,-2], [-2,1],[-1,-2],[-2,-1]}");
         assert_ne!(r1, None);
         assert_ne!(r2, None);
-        //assert_eq(r1,r2); this is only after the deflator
+        assert_eq!(r1,r2); 
     }
 
     #[test]

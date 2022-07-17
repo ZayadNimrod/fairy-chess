@@ -1,5 +1,7 @@
 use crate::parser;
 
+
+//TODO implement equality such that two choice nodes that have thier choices in a different order, but the same choices, are equal.
 #[derive(Debug, PartialEq)]
 pub enum Move {
     Jump(parser::Jump),
@@ -45,7 +47,7 @@ impl Move {
                     })
                     .collect::<Vec<String>>()
                     .concat();
-                return left + &mod_sequence;
+                left + &mod_sequence
             }
         }
     }
@@ -91,7 +93,17 @@ impl Deflatable for parser::PieceOption {
             parser::PieceOption::Jump(j) => Move::Jump(j),
             parser::PieceOption::Move(m) => m.deflate(),
             parser::PieceOption::Options(moves) => {
-                Move::Choice(moves.into_iter().map(|x| x.deflate()).collect())
+                let choices = moves
+                    .into_iter()
+                    .map(|x| x.deflate())
+                    .map(|x| match x {
+                        Move::Choice(c) => c,
+                        _ => vec![x],
+                    }) //unpack choices, i.e turn {{a,b},{c,d}} into {a,b,c,d}
+                    .flatten()
+                    .collect();
+
+                Move::Choice(choices)
             }
         }
     }

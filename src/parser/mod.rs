@@ -4,8 +4,6 @@ use peeking_take_while::PeekableExt;
 
 mod deflator;
 use deflator::Deflatable;
-use crate::movespec;
-
 
 #[derive(Debug, PartialEq)]
 pub enum Mod {
@@ -16,7 +14,6 @@ pub enum Mod {
     ExponentiateRange(usize, usize), //bounds of the range of exponents
     ExponentiateInfinite(usize),     //lower bound of exponent
 }
-
 
 #[derive(Debug, PartialEq)]
 pub enum Modded {
@@ -43,7 +40,6 @@ pub struct Jump {
     pub y: i32,
 }
 
-
 #[derive(Debug, PartialEq)]
 pub enum ParsingError {
     ExpectedCharacter(Vec<&'static str>, char, usize), //expected <str or str or str...>, got <char>, at index <usize>
@@ -52,10 +48,6 @@ pub enum ParsingError {
     NotAValidExponent(TryFromIntError, i32, usize), //Given exponent <int> at index <char> is not valid
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
 }
-
-
-
-
 
 pub fn parse_string(input: &str) -> Result<crate::movespec::Move, ParsingError> {
     //TODO also filter out tabs
@@ -340,13 +332,6 @@ where
         Ok(abs)
     }
 }
-
-
-
-
-
-
-
 
 //TODO test specific errors
 

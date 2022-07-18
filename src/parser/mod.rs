@@ -2,7 +2,10 @@ use std::{iter::Peekable, num::TryFromIntError, vec};
 
 use peeking_take_while::PeekableExt;
 
-use crate::deflator::{Deflatable, Move};
+mod deflator;
+use deflator::Deflatable;
+use crate::movespec;
+
 
 #[derive(Debug, PartialEq)]
 pub enum Mod {
@@ -14,11 +17,6 @@ pub enum Mod {
     ExponentiateInfinite(usize),     //lower bound of exponent
 }
 
-/*
-#[derive(Debug, PartialEq)]
-pub enum Move {
-    Seq(Box<Seq>),
-}*/
 
 #[derive(Debug, PartialEq)]
 pub enum Modded {
@@ -44,33 +42,7 @@ pub struct Jump {
     pub x: i32,
     pub y: i32,
 }
-/*
-Jump    ::= [Int,Int]
 
-Mod     ::= -
-            | |
-            | /
-            | ^ Int
-            | ^ [Int..Int]
-            | ^ [Int..*]
-
-
-OptionC ::= Move
-            | Move , OptionC
-
-Option  ::= {OptionC}
-            | (Move)
-            | Jump
-
-Seq     ::= Modded * Seq
-            | Modded
-
-Modded  ::= | Option Mod
-            | Option
-
-Move    ::=  Seq
-
-*/
 
 #[derive(Debug, PartialEq)]
 pub enum ParsingError {
@@ -81,7 +53,11 @@ pub enum ParsingError {
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
 }
 
-pub fn parse_string(input: &str) -> Result<Move, ParsingError> {
+
+
+
+
+pub fn parse_string(input: &str) -> Result<crate::movespec::Move, ParsingError> {
     //TODO also filter out tabs
     let mut a = input
         .chars()
@@ -364,6 +340,15 @@ where
         Ok(abs)
     }
 }
+
+
+
+
+
+
+
+
+//TODO test specific errors
 
 #[cfg(test)]
 mod tests {

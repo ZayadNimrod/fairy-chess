@@ -1,6 +1,5 @@
 mod parser;
-mod deflator;
-pub use crate::deflator::Move;
+pub mod movespec;
 
 
 pub enum PieceCreationError{

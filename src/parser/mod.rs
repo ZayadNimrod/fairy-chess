@@ -34,12 +34,14 @@ pub enum PieceOption {
     Jump(Jump),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Jump {
     pub x: i32,
     pub y: i32,
 }
 
+
+//TODO the [0,0] move needs to be specifically illegal, as should nonpositive and zero exponents!
 #[derive(Debug, PartialEq)]
 pub enum ParsingError {
     ExpectedCharacter(Vec<&'static str>, char, usize), //expected <str or str or str...>, got <char>, at index <usize>
@@ -49,7 +51,7 @@ pub enum ParsingError {
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
 }
 
-pub fn parse_string(input: &str) -> Result<crate::movespec::Move, ParsingError> {
+pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
     //TODO also filter out tabs
     let mut a = input
         .chars()
@@ -57,11 +59,15 @@ pub fn parse_string(input: &str) -> Result<crate::movespec::Move, ParsingError> 
         .filter(|(_, x): &(usize, char)| *x != ' ')
         .peekable();
     let r = parse_seq(&mut a);
-    match a.next() {
-        None => r,
-        Some((idx, _)) => Err(ParsingError::ExpectedEOF(idx)), //check that the whole string was consumed.
+    match r {
+        Ok(ast) => {match a.next() {
+            None => Ok(ast.deflate()),
+            Some((idx, _)) => Err(ParsingError::ExpectedEOF(idx)), //check that the whole string was consumed.
+        }},
+        Err(e) => Err(e),
     }
-    .map(|x| x.deflate())
+
+    
 }
 
 fn parse_seq<T>(input: &mut Peekable<T>) -> Result<Seq, ParsingError>
@@ -337,7 +343,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_string;
+    use crate::parser::{parse_string};
 
     #[test]
     fn jumps() {
@@ -392,5 +398,29 @@ mod tests {
         let rook = parse_string("[1,0]^*|-");
         //println!("{:#?}",rook);
         assert!(rook.is_ok());
+    }
+
+    #[test]
+    fn integer_parsing() {
+        let knight = parse_string("[2,1]/|-");
+        assert!(knight.is_ok());
+        let knight = parse_string("[e,1]/|-");
+        match knight.err().unwrap() {
+            crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 1),
+            crate::parser::ParsingError::ExpectedEOF(_) => assert!(false),
+            crate::parser::ParsingError::UnexpectedEOF() => assert!(false),
+            crate::parser::ParsingError::NotAValidExponent(_, _, _) => assert!(false),
+            crate::parser::ParsingError::IntegerParsingError(_, _) => assert!(false),
+        }        
+        let knight = parse_string("[2.2,1]/|-");
+        assert!(knight.is_err());
+        println!("{:?}",knight);
+        match knight.unwrap_err(){
+            crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i,2), //the decimal point should cause an error
+            crate::parser::ParsingError::ExpectedEOF(_) => assert!(false),
+            crate::parser::ParsingError::UnexpectedEOF() => assert!(false),
+            crate::parser::ParsingError::NotAValidExponent(_, _, _) => assert!(false),
+            crate::parser::ParsingError::IntegerParsingError(_, _) => assert!(true),
+        }
     }
 }

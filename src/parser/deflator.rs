@@ -1,12 +1,12 @@
+use crate::movespec::MoveCompact;
 use crate::parser;
-use crate::movespec::Move;
 
 pub trait Deflatable {
-    fn deflate(self) -> Move;
+    fn deflate(self) -> MoveCompact;
 }
 
 impl Deflatable for parser::Seq {
-    fn deflate(self) -> Move {
+    fn deflate(self) -> MoveCompact {
         match self {
             parser::Seq::Modded(m) => m.deflate(),
 
@@ -14,12 +14,12 @@ impl Deflatable for parser::Seq {
                 let head = head.deflate();
                 let tail = tail.deflate();
                 match tail {
-                    Move::Sequence(mut arr) => {
-                        let mut s: Vec<Move> = vec![head];
+                    MoveCompact::Sequence(mut arr) => {
+                        let mut s: Vec<MoveCompact> = vec![head];
                         s.append(&mut arr);
-                        Move::Sequence(s)
+                        MoveCompact::Sequence(s)
                     }
-                    t => Move::Sequence(vec![head, t]),
+                    t => MoveCompact::Sequence(vec![head, t]),
                 }
             }
         }
@@ -27,30 +27,34 @@ impl Deflatable for parser::Seq {
 }
 
 impl Deflatable for parser::Modded {
-    fn deflate(self) -> Move {
+    fn deflate(self) -> MoveCompact {
         match self {
             parser::Modded::One(o) => o.deflate(),
-            parser::Modded::Modded(o, mods) => Move::Modded(Box::new(o.deflate()), mods),
+            parser::Modded::Modded(o, mods) => {
+                let inner = o.deflate();
+                mods.into_iter()
+                    .fold(inner, |acc, m| MoveCompact::Modded(Box::new(acc), m))
+            }
         }
     }
 }
 
 impl Deflatable for parser::PieceOption {
-    fn deflate(self) -> Move {
+    fn deflate(self) -> MoveCompact {
         match self {
-            parser::PieceOption::Jump(j) => Move::Jump(j),
+            parser::PieceOption::Jump(j) => MoveCompact::Jump(j),
             parser::PieceOption::Move(m) => m.deflate(),
             parser::PieceOption::Options(moves) => {
                 let choices = moves
                     .into_iter()
                     .map(|x| x.deflate())
                     .flat_map(|x| match x {
-                        Move::Choice(c) => c,
+                        MoveCompact::Choice(c) => c,
                         _ => vec![x],
                     }) //unpack choices, i.e turn {{a,b},{c,d}} into {a,b,c,d}
                     .collect();
-                    //TODO perhaps also deflate obviously mirrored items in a choice node?
-                Move::Choice(choices)
+                //TODO perhaps also deflate obviously mirrored items in a choice node?
+                MoveCompact::Choice(choices)
             }
         }
     }

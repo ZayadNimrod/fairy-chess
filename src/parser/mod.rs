@@ -5,7 +5,7 @@ use peeking_take_while::PeekableExt;
 mod deflator;
 use deflator::Deflatable;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Clone)]
 pub enum Mod {
     HorizontalMirror,
     VerticalMirror,

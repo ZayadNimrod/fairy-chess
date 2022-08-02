@@ -3,6 +3,8 @@ mod parser;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
+
+#[derive(Debug)]
 pub enum PieceCreationError {
     ParserError(parser::ParsingError),
 }
@@ -17,7 +19,7 @@ pub trait Board {
     fn tile_at(&self, position: (i32, i32)) -> TileState; //returns the state of the board
 }
 
-struct MoveTrace {
+pub struct MoveTrace {
     current_move: petgraph::graph::DefaultIx,
     current_position: (i32, i32),
     trace: Vec<(i32, i32, petgraph::graph::DefaultIx)>, //TODO should be an index type of MoveGraph //TODO should be a forking list, not a vec?
@@ -27,11 +29,11 @@ struct MoveTrace {
 Assumes that target_position is not impassable (i.e open tile with no friendly piece)
 */
 pub fn check_move<B>(
-    piece: MoveGraph,
-    board: B,
+    piece: &MoveGraph,
+    board: &B,
     start_position: (i32, i32),
     target_position: (i32, i32),
-) -> bool
+) -> Option<MoveTrace>
 where
     B: Board,
 {
@@ -56,8 +58,8 @@ where
                 .outgoing_edges(head.current_move)
                 .any(|e| *e.weight() == movespec::EdgeType::Required)
             {
-                //TODO return trace
-                return true;
+                
+                return Some(head);
             }
         }
 
@@ -104,7 +106,7 @@ where
     }
 
     //no trace found a path to the target, no path could exist!
-    false
+    None
 }
 
 pub fn create_piece_simple(s: &str) -> Result<MoveCompact, PieceCreationError> {
@@ -112,4 +114,48 @@ pub fn create_piece_simple(s: &str) -> Result<MoveCompact, PieceCreationError> {
         Ok(o) => Ok(o),
         Err(e) => Err(PieceCreationError::ParserError(e)),
     }
+}
+
+
+#[cfg(test)]
+mod tests{
+    use crate::{create_piece_simple, movespec::MoveGraph, check_move};
+
+    struct TestBoard {
+        x_max:i32,
+        y_max:i32
+    }
+
+    impl crate::Board for TestBoard {
+        fn tile_at(&self, position: (i32, i32)) -> crate::TileState {
+        if position.0 > self.x_max || position.0 < 0 || position.1 > self.y_max || position.1 <0{
+            return crate::TileState::Impassable;
+        }
+        crate::TileState::Empty
+    }
+    }
+
+    
+    #[test]
+    fn knight() {
+        let board = &TestBoard{x_max:7, y_max:7};
+        let k  = &MoveGraph::from(create_piece_simple("[1,2]|-/").unwrap());
+        let start_position = (4,4);
+        
+
+        let points_r = (-2..=9).collect::<Vec<i32>>();
+
+        let points = points_r.iter().flat_map(|x|{
+            points_r.iter().map(|y|(*x,*y))
+        });
+
+        let valids :Vec<(i32,i32)> = points.filter(|p|check_move(k, board, start_position, *p).is_some()).collect();
+
+        assert_eq!(valids, vec![(2,3),(2,5),(3,2),(3,6),(5,2),(5,6),(6,3),(6,5)])
+    }
+
+
+
+
+    //TODO make sure to test something convoluted like two infinite exponentiations nested
 }

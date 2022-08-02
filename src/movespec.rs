@@ -142,7 +142,7 @@ impl MoveGraph {
 
                 choices.iter().for_each(|c| {
                     let (h, t) = self.build_from_node(c);
-                    self.graph.add_edge(head_idx, h, EdgeType::Optional);
+                    self.graph.add_edge(head_idx, h, EdgeType::Required);
                     self.graph.add_edge(t, tail_idx, EdgeType::Required);
                 });
 
@@ -203,19 +203,16 @@ impl MoveGraph {
                 //let mov_inner = &**mov;
                 for exp in *min..=*max {
                     let (h, t) = self.build_from_mod(mov, &Mod::Exponentiate(exp));
-                    self.graph.add_edge(head, h, EdgeType::Optional);
+                    self.graph.add_edge(head, h, EdgeType::Required);
                     self.graph.add_edge(t, tail, EdgeType::Required);
                 }
                 (head, tail)
             }
-            Mod::ExponentiateInfinite(min) => {
-                let head = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
+            Mod::ExponentiateInfinite(min) => {                
                 if *min == 1 {
                     let (loop_back, t) = self.build_from_node(&*mov);
                     self.graph.add_edge(t, loop_back, EdgeType::Optional);
-                    (head, t)
+                    (loop_back, t)
                 } else {
                     let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(min - 1));
                     let (h_mid, t) = self.build_from_mod(mov, &Mod::ExponentiateInfinite(1));

@@ -414,7 +414,7 @@ mod tests {
         }        
         let knight = parse_string("[2.2,1]/|-");
         assert!(knight.is_err());
-        println!("{:?}",knight);
+        //println!("{:?}",knight);
         match knight.unwrap_err(){
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i,2), //the decimal point should cause an error
             crate::parser::ParsingError::ExpectedEOF(_) => assert!(false),

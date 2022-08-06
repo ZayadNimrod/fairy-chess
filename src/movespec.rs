@@ -1,7 +1,11 @@
 use std::iter::Zip;
-use std::ops::Index;
 
 use petgraph;
+use petgraph::EdgeDirection;
+use petgraph::graph::IndexType;
+use petgraph::graph::NodeIndex;
+use petgraph::visit::EdgeRef;
+use petgraph::visit::IntoEdges;
 use petgraph::visit::IntoNeighbors;
 
 use crate::parser;
@@ -71,17 +75,19 @@ impl TryFrom<String> for MoveCompact {
 }
 
 pub struct MoveGraphNode {
-    jump: Jump,
+    //jump: Jump,
 }
 
-//TODO couldn't Jump be the edge wieght, and nodes be Units? We can test whether that works better later
-pub struct MoveGraph {
-    graph:
-        petgraph::csr::Csr<MoveGraphNode, EdgeType, petgraph::Directed, petgraph::graph::DefaultIx>,
-    head: petgraph::graph::DefaultIx,
+#[derive(Debug)]
+pub struct MoveGraph<Ix>
+where
+    Ix: IndexType,
+{
+    graph: petgraph::stable_graph::StableDiGraph<(), (EdgeType, Jump), Ix>,
+    head: NodeIndex<Ix>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq,Debug)]
 pub enum EdgeType {
     Optional,
     Required,
@@ -89,11 +95,15 @@ pub enum EdgeType {
 
 //TODO do I want it to consume the MoveCompact? I can't convert back, and MoveCompact is actually serializable, unless we count the string representation- which has to be genrated from MoveCompact anyway!
 //It'll have to though, I think, that's how MoveCompact works, it owns its values...
-impl From<MoveCompact> for MoveGraph {
+impl<Ix> From<MoveCompact> for MoveGraph<Ix>
+where
+    Ix: IndexType,
+{
     fn from(input: MoveCompact) -> Self {
-        let mut r = MoveGraph {
-            graph: petgraph::csr::Csr::new(),
-            head: 0,
+        let mut r = MoveGraph::<Ix> {
+            graph:
+                petgraph::stable_graph::StableDiGraph::<(), (EdgeType, Jump),Ix>::with_capacity(0,0,),
+            head: NodeIndex::<Ix>::default(),
         };
         let (h, _) = r.build_from_node(&input);
         r.head = h;
@@ -116,45 +126,44 @@ impl MoveCompact {
     }
 }
 
-impl MoveGraph {
-    //TODO an optimiser for this, notice we are generating dummy nodes!
-    fn build_from_node(
-        &mut self,
-        node: &MoveCompact,
-    ) -> (petgraph::graph::DefaultIx, petgraph::graph::DefaultIx) {
+impl<Ix> MoveGraph<Ix>
+where
+    Ix: IndexType,
+{
+    //TODO we generate a bunch of dummy nodes; DELETE THEM
+    fn build_from_node(&mut self, node: &MoveCompact) -> (NodeIndex<Ix>, NodeIndex<Ix>) {
         match node {
             MoveCompact::Jump(j) => {
-                let idx = self.graph.add_node(MoveGraphNode { jump: *j });
-                (idx, idx)
+                let h = self.graph.add_node(());
+                let t = self.graph.add_node(());
+                self.graph.add_edge(h, t, (EdgeType::Required, *j));
+                (h, t)
             }
             MoveCompact::Choice(choices) => {
-                let head_idx = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
-                let tail_idx = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
+                let head_idx = self.graph.add_node(());
+                let tail_idx = self.graph.add_node(());
 
+                //merge the heads and tails of all the choice graphs
                 choices.iter().for_each(|c| {
                     let (h, t) = self.build_from_node(c);
-                    self.graph.add_edge(head_idx, h, EdgeType::Required);
-                    self.graph.add_edge(t, tail_idx, EdgeType::Required);
+                    self.merge(head_idx, h);
+                    self.merge(tail_idx, t);
                 });
 
                 (head_idx, tail_idx)
             }
             MoveCompact::Sequence(seq) => {
-                let head_idx = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
-                let mut tail_idx = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
-                seq.iter().for_each(|s| {
+                
+                let mut tail_idx = self.graph.add_node(());
+    
+                let head_idx: NodeIndex<Ix>=seq.iter().map(|s| {
                     let (h, t) = self.build_from_node(s);
-                    self.graph.add_edge(tail_idx, h, EdgeType::Required);
+                    //merge tail_idx with h
+                    self.merge(h, tail_idx);
+                    //get new tail
                     tail_idx = t;
-                });
+                    h
+                }).next().unwrap_or(tail_idx);
 
                 (head_idx, tail_idx)
             }
@@ -166,7 +175,7 @@ impl MoveGraph {
         &mut self,
         mov: &MoveCompact,
         modifier: &Mod,
-    ) -> (petgraph::graph::DefaultIx, petgraph::graph::DefaultIx) {
+    ) -> (NodeIndex<Ix>, NodeIndex<Ix>) {
         match modifier {
             Mod::HorizontalMirror => self.build_from_node(&MoveCompact::Choice(vec![
                 mov.map(|j| Jump { x: j.x, y: -j.y }),
@@ -186,63 +195,96 @@ impl MoveGraph {
                 } else {
                     let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(exp - 1));
                     let (h_mid, t) = self.build_from_node(mov);
-                    self.graph.add_edge(t_mid, h_mid, EdgeType::Required);
+                    self.merge(t_mid, h_mid);
                     (h, t)
                 }
             }
             Mod::ExponentiateRange(min, max) => {
-                let head = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
-                let tail = self.graph.add_node(MoveGraphNode {
-                    jump: Jump { x: 0, y: 0 },
-                });
-                //let mov_inner = &**mov;
+                let head = self.graph.add_node(());
+                let tail = self.graph.add_node(());
+
                 for exp in *min..=*max {
                     let (h, t) = self.build_from_mod(mov, &Mod::Exponentiate(exp));
-                    self.graph.add_edge(head, h, EdgeType::Required);
-                    self.graph.add_edge(t, tail, EdgeType::Required);
+
+                    //merge hs into head, and ts and into tail
+                    self.merge(head, h);
+                    self.merge(tail, t);
                 }
                 (head, tail)
             }
             Mod::ExponentiateInfinite(min) => {
+                //TODO do we have to use 1 as a guard value? Let's turn it into its own function, no?
                 if *min == 1 {
                     let (loop_back, t) = self.build_from_node(&*mov);
-                    self.graph.add_edge(t, loop_back, EdgeType::Optional);
+                    
+                    let to_make_optional: Vec<(NodeIndex<Ix>, (EdgeType,Jump))> = self.graph
+                                .edges_directed(t, EdgeDirection::Incoming)
+                                .map(|r| (r.source(), *r.weight()))
+                                .collect();
+
+                    for (source, (_,j)) in to_make_optional {
+                        //self.graph.update_edge(source, t, (EdgeType::Optional,j));
+                        self.graph.add_edge(source, loop_back, (EdgeType::Optional,j));
+                    }
+
                     (loop_back, t)
                 } else {
-                    let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(min - 1));
+                    let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(*min-1)); 
                     let (h_mid, t) = self.build_from_mod(mov, &Mod::ExponentiateInfinite(1));
-                    self.graph.add_edge(t_mid, h_mid, EdgeType::Required);
+                    self.merge(h_mid, t_mid);
                     (h, t)
                 }
             }
         }
     }
 
-    pub fn successors(&self, idx: petgraph::graph::DefaultIx) -> petgraph::csr::Neighbors {
+
+    fn merge(&mut self,to_keep: NodeIndex<Ix>,to_drop: NodeIndex<Ix>) {
+       
+        let drop_outgoing: Vec<(NodeIndex<Ix>, (EdgeType,Jump))> = self.graph
+        .edges_directed(to_drop, EdgeDirection::Outgoing)
+        .map(|r| (r.target(), *r.weight()))
+        .collect();
+
+        for (target, weight) in drop_outgoing {
+            self.graph.add_edge(to_keep, target, weight);
+        }
+
+        let drop_incoming: Vec<(NodeIndex<Ix>, (EdgeType,Jump))> = self.graph
+            .edges_directed(to_drop, EdgeDirection::Incoming)
+            .map(|r| (r.source(), *r.weight()))
+            .collect();
+
+        for (source, weight) in drop_incoming {
+            self.graph.add_edge(source, to_keep, weight);
+        }
+        self.graph.remove_node(to_drop);
+    
+    }
+
+    pub fn successors(&self, idx: NodeIndex<Ix>) -> <&petgraph::stable_graph::StableDiGraph<(), (EdgeType, Jump), Ix> as IntoNeighbors>::Neighbors{
         self.graph.neighbors(idx)
     }
 
     pub fn outgoing_edges(
         &self,
-        idx: petgraph::graph::DefaultIx,
-    ) -> petgraph::csr::Edges<EdgeType> {
+        idx: NodeIndex<Ix>,
+    ) -> <&petgraph::stable_graph::StableDiGraph<(), (EdgeType, Jump), Ix> as IntoEdges>::Edges{
         self.graph.edges(idx)
     }
 
+   
+
     pub fn all_outgoing(
         &self,
-        idx: petgraph::graph::DefaultIx,
-    ) -> Zip<petgraph::csr::Neighbors, petgraph::csr::Edges<EdgeType>> {
+        idx: NodeIndex<Ix>,
+    ) -> Zip<<&petgraph::stable_graph::StableDiGraph<(), (EdgeType, Jump), Ix> as IntoNeighbors>::Neighbors, <&petgraph::stable_graph::StableDiGraph<(), (EdgeType, Jump), Ix> as IntoEdges>::Edges> {
         self.successors(idx).zip(self.outgoing_edges(idx))
     }
 
-    pub fn jump_at(&self, idx: petgraph::graph::DefaultIx) -> &Jump {
-        &self.graph.index(idx).jump
-    }
 
-    pub fn head(&self) -> u32 {
+
+    pub fn head(&self) -> NodeIndex<Ix> {
         self.head
     }
 }

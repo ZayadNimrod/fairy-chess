@@ -3,6 +3,8 @@ mod parser;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
+use petgraph::graph::IndexType;
+use petgraph::graph::NodeIndex;
 
 #[derive(Debug)]
 pub enum PieceCreationError {
@@ -19,23 +21,25 @@ pub trait Board {
     fn tile_at(&self, position: (i32, i32)) -> TileState; //returns the state of the board
 }
 
-pub struct MoveTrace {
-    current_move: petgraph::graph::DefaultIx,
+//TODO this can be an assosciated type with MoveGraph?
+pub struct MoveTrace<Ix> {
+    current_move: NodeIndex<Ix>,
     current_position: (i32, i32),
-    trace: Vec<(i32, i32, petgraph::graph::DefaultIx)>, //TODO should be an index type of MoveGraph //TODO should be a forking list, not a vec?
+    trace: Vec<(i32, i32, NodeIndex<Ix>)>, //TODO should be a forking list, not a vec?
 }
 
 /**
 Assumes that target_position is not impassable (i.e open tile with no friendly piece)
 */
-pub fn check_move<B>(
-    piece: &MoveGraph,
+pub fn check_move<B, Ix>(
+    piece: &MoveGraph<Ix>,
     board: &B,
     start_position: (i32, i32),
     target_position: (i32, i32),
-) -> Option<MoveTrace>
+) -> Option<MoveTrace<Ix>>
 where
     B: Board,
+    Ix: IndexType,
 {
     //breadth-first search with a vector storing the points we have visited before (and therefore don't need to visit again)
     //using BFS rather than depth-first should mean we'll find the shortest route
@@ -45,20 +49,20 @@ where
     //We assume that board.tile_at() is cheap to call
     //TODO that might not be a good assumption, perhaps create a version of this algorithm that minimises such calls on the assumption it's expensive
 
-    let mut traces: Vec<MoveTrace> = vec![MoveTrace {
+    let mut traces: Vec<MoveTrace<Ix>> = vec![MoveTrace::<Ix> {
         current_move: piece.head(),
         current_position: start_position,
         trace: Vec::new(),
     }];
 
-    let mut visited: Vec<(i32, i32, petgraph::graph::DefaultIx)> = Vec::new();
+    let mut visited: Vec<(i32, i32, NodeIndex<Ix>)> = Vec::new();
 
     while let Some(head) = traces.pop() {
         if head.current_position == target_position {
             //we reached the target, check that we don't have further moves to make. If not, we've reached the target tile successfuly!
             if !piece
                 .outgoing_edges(head.current_move)
-                .any(|e| *e.weight() == movespec::EdgeType::Required)
+                .any(|e| e.weight().0 == movespec::EdgeType::Required)
             {
                 return Some(head);
             }
@@ -66,18 +70,10 @@ where
 
         //if the next position is impassable, then we cannot continue on this trace; this is not a valid position to be in
         //unless this position is the target position; which it isn't, otherwise we would have retarned in the previous block
+        //NOTE: this check breaks if we allow [0,0] moves; the parser blocks them, and the Move Graph constructor shouldn't create any
         if board.tile_at(head.current_position) == TileState::Impassable {
-            /*println!(
-                "impassable {:?}! in queue: {} ",
-                head.current_position,
-                traces.len()
-            );*/
             continue;
-        }//TODO this isnt correct either; it is possible to be at the target position and not return earlier, if we still have dummy nodes (AND ONLY DUMMY NODES) to clear...
-
-        let j = piece.jump_at(head.current_move);
-        let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
-        
+        }
 
         //test that this trace isn't in a loop
         if visited
@@ -86,19 +82,14 @@ where
         {
             //this trace has already been at this location at the same point in the graph!
             //this means it has looped once, so delete it
-            /*println!(
-                "skipped {:?}! in queue: {} ",
-                head.current_position,
-                traces.len()
-            );*/
             continue;
         }
 
         //append the next moves to the
         //TODO maximise the amount we consume! If there is one one sucessor and it is required, don't do the bullshit of pushing it onto the trace pile, JUST PROCESS IT EAGERLY
         let mut next_moves = piece
-            .successors(head.current_move)
-            .map(|n| {
+            .all_outgoing(head.current_move)
+            .map(|(n, e)| {
                 //TODO this could be a lot simpler if we used a reverse linked list...
                 let mut new_trace = head.trace.clone();
                 new_trace.push((
@@ -107,13 +98,15 @@ where
                     head.current_move,
                 ));
 
+                let j = e.weight().1;
+                let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
                 MoveTrace {
                     current_move: n,
                     current_position: new_position,
                     trace: new_trace,
                 }
             })
-            .collect::<Vec<MoveTrace>>();
+            .collect::<Vec<MoveTrace<Ix>>>();
         visited.push((
             head.current_position.0,
             head.current_position.1,
@@ -159,7 +152,7 @@ mod tests {
     #[test]
     fn knight() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
-        let k = &MoveGraph::from(create_piece_simple("[1,2]|-/").unwrap());
+        let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]|-/").unwrap());
         let start_position = (4, 4);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -190,7 +183,7 @@ mod tests {
     #[test]
     fn knight_offset() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
-        let k = &MoveGraph::from(create_piece_simple("[1,2]|-/").unwrap());
+        let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]|-/").unwrap());
         let start_position = (1, 1);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -203,16 +196,29 @@ mod tests {
             .filter(|p| check_move(k, board, start_position, *p).is_some())
             .collect();
 
-        assert_eq!(valids, vec![(0, 3), (2, 3), (3, 0), (3, 2)])
+        assert_eq!(
+            valids,
+            vec![
+                (-1, 0),
+                (-1, 2),
+                (0, -1),
+                (0, 3),
+                (2, -1),
+                (2, 3),
+                (3, 0),
+                (3, 2)
+            ]
+        )
     }
 
     #[test]
     fn knightrider() {
         let board = &TestBoard { x_max: 8, y_max: 8 };
-        let k = &MoveGraph::from(create_piece_simple("[1,2]^*|-/").unwrap());
+        let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]^*|-/").unwrap());
+        println!("{:?}",k);
         let start_position = (2, 2);
 
-        let points_r = (-3..=11).collect::<Vec<i32>>();
+        let points_r = (0..=8).collect::<Vec<i32>>();
 
         let points = points_r
             .iter()
@@ -260,6 +266,8 @@ mod tests {
     fn infinte_king() {
         let points_r = (-3..=11).collect::<Vec<i32>>();
 
+
+        //infinite king should not be able to reach an island that is surrounded by impassable squares
         let grid_points = points_r
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
@@ -272,7 +280,7 @@ mod tests {
             .collect::<Vec<(i32, i32)>>();
 
         let board = &DetailedTestBoard { grid: grid_points };
-        let piece = &MoveGraph::from(create_piece_simple("{[1,0]/,[1,1]}|-^*").unwrap());
+        let piece = &MoveGraph::<u32>::from(create_piece_simple("{[1,0]/,[1,1]}|-^*").unwrap());
         let start_position = (1, 1);
 
         let points = points_r
@@ -288,8 +296,6 @@ mod tests {
     }
 
     //TODO make sure to test something convoluted like two infinite exponentiations nested
-
-    //TODO try a kingrider with an island he can't reach
 
     //TODO try a knightrider that is blocked at one point and therefore can't reach subsequent positions
 }

@@ -423,4 +423,11 @@ mod tests {
             crate::parser::ParsingError::IntegerParsingError(_, _) => assert!(true),
         }
     }
+
+    #[test]
+    fn jump_parsing(){
+        //0,0 shouldn't be allowed to parse!
+        let i = parse_string("[0,0]");
+        assert!(i.is_err());
+    }
 }

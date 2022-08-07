@@ -22,10 +22,11 @@ pub trait Board {
 }
 
 //TODO this can be an assosciated type with MoveGraph?
+#[derive(Debug)]
 pub struct MoveTrace<Ix> {
-    current_move: NodeIndex<Ix>,
-    current_position: (i32, i32),
-    trace: Vec<(i32, i32, NodeIndex<Ix>)>, //TODO should be a forking list, not a vec?
+    pub current_move: NodeIndex<Ix>,
+    pub current_position: (i32, i32),
+    pub trace: Vec<(i32, i32, NodeIndex<Ix>)>, //TODO should be a forking list, not a vec?
 }
 
 /**
@@ -58,11 +59,18 @@ where
     let mut visited: Vec<(i32, i32, NodeIndex<Ix>)> = Vec::new();
 
     while let Some(head) = traces.pop() {
+        //println!("testing:{:?}",head.current_position);
         if head.current_position == target_position {
+            //println!("Possible target!");
             //we reached the target, check that we don't have further moves to make. If not, we've reached the target tile successfuly!
             if !piece
                 .outgoing_edges(head.current_move)
-                .any(|e| e.weight().0 == movespec::EdgeType::Required)
+                .any(|e| match e.weight() {
+                    movespec::EdgeType::Optional(_) => false,
+                    movespec::EdgeType::Required(_) => true,
+                    movespec::EdgeType::DummyOptional => false,
+                    movespec::EdgeType::DummyRequired => true,
+                })
             {
                 return Some(head);
             }
@@ -85,20 +93,31 @@ where
             continue;
         }
 
-        //append the next moves to the
-        //TODO maximise the amount we consume! If there is one one sucessor and it is required, don't do the bullshit of pushing it onto the trace pile, JUST PROCESS IT EAGERLY
-        let mut next_moves = piece
+        let next_moves = piece
             .all_outgoing(head.current_move)
             .map(|(n, e)| {
                 //TODO this could be a lot simpler if we used a reverse linked list...
+
+                let j = match e.weight() {
+                    movespec::EdgeType::Optional(j) => j,
+                    movespec::EdgeType::Required(j) => j,
+                    movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
+                        return MoveTrace {
+                            current_move: n,
+                            current_position: head.current_position,
+                            trace: head.trace.clone(),
+                        };
+                    }
+                };
+
                 let mut new_trace = head.trace.clone();
+
                 new_trace.push((
                     head.current_position.0,
                     head.current_position.1,
                     head.current_move,
                 ));
 
-                let j = e.weight().1;
                 let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
                 MoveTrace {
                     current_move: n,
@@ -107,12 +126,73 @@ where
                 }
             })
             .collect::<Vec<MoveTrace<Ix>>>();
+
+        //eagerly follow Dummy edges. We need to do this, otherwise, we will prematurely stop following the trace due to the impassability check.
+        //Consider a choice that is the last in the move sequence, that reaches the target position, which is impassable.
+        //Becuase there is still a dummy edge ahead of it, it is not considered a finished move, so we don;t return true. Instead, we drop the trace, as we are on an impassable tile!
+        //So we must eagerly follow them.
+        let mut follow_up: Vec<MoveTrace<Ix>> = next_moves;
+
+        //Follow up on dummy edges until there are no dummy edges left
+        loop {
+            let mut followed_up_on = false;
+            let follow_up_next: Vec<MoveTrace<Ix>> = follow_up
+                .iter()
+                .flat_map(|mt| {
+                    let hd = mt.current_move;
+
+                    //if all outgoing edges are optional (or there are no outgoing edges), stay here. Otherwise, advance!
+
+                    if !piece.all_outgoing(hd).any(|(_, e)| match e.weight() {
+                        movespec::EdgeType::Optional(_) => true,
+                        movespec::EdgeType::Required(_) => false,
+                        movespec::EdgeType::DummyOptional => true,
+                        movespec::EdgeType::DummyRequired => false,
+                    }) {
+                        //there exist at least one non-optionla egde. Therefore, we cannot stay here, so follow up required dummy edges
+                        piece
+                            .all_outgoing(hd)
+                            .map(|(n, e)| match e.weight() {
+                                movespec::EdgeType::DummyRequired => {
+                                    followed_up_on = true;
+                                    MoveTrace {
+                                        current_move: n,
+                                        current_position: mt.current_position,
+                                        trace: mt.trace.clone(),
+                                    }
+                                }
+
+                                _ => MoveTrace {
+                                    current_move: hd,
+                                    current_position: mt.current_position,
+                                    trace: mt.trace.clone(),
+                                },
+                            })
+                            .collect::<Vec<MoveTrace<Ix>>>()
+                    } else {
+                        //all outgoing edges are optional, so just return self; we don't *have* to advance in any way, so return the current node
+                        vec![MoveTrace {
+                            current_move: hd,
+                            current_position: mt.current_position,
+                            trace: mt.trace.clone(),
+                        }]
+                    }
+                })
+                .collect();
+
+            if !followed_up_on {
+                break;
+            }
+
+            follow_up = follow_up_next;
+        }
+
         visited.push((
             head.current_position.0,
             head.current_position.1,
             head.current_move,
         ));
-        traces.append(&mut next_moves);
+        traces.append(&mut follow_up);
     }
 
     //no trace found a path to the target, no path could exist!
@@ -150,9 +230,16 @@ mod tests {
     }
 
     #[test]
+    fn knight_t() {
+        let board = &TestBoard { x_max: 7, y_max: 7 };
+        let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]|-/").unwrap());
+        assert!(check_move(k, board, (4, 4), (5, 6)).is_some());
+    }
+    #[test]
     fn knight() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
         let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]|-/").unwrap());
+        println!("{:?}", petgraph::dot::Dot::with_config(&(k.graph), &[]));
         let start_position = (4, 4);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -215,7 +302,7 @@ mod tests {
     fn knightrider() {
         let board = &TestBoard { x_max: 8, y_max: 8 };
         let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]^*|-/").unwrap());
-        println!("{:?}",k);
+        println!("{:?}", petgraph::dot::Dot::with_config(&(k.graph), &[]));
         let start_position = (2, 2);
 
         let points_r = (0..=8).collect::<Vec<i32>>();
@@ -225,7 +312,10 @@ mod tests {
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(k, board, start_position, *p).is_some())
+            .filter(|p| {
+                println!("Calculating: {:?}", p);
+                check_move(k, board, start_position, *p).is_some()
+            })
             .collect();
 
         assert_eq!(
@@ -264,8 +354,7 @@ mod tests {
     }
     #[test]
     fn infinte_king() {
-        let points_r = (-3..=11).collect::<Vec<i32>>();
-
+        let points_r = (-1..=9).collect::<Vec<i32>>();
 
         //infinite king should not be able to reach an island that is surrounded by impassable squares
         let grid_points = points_r
@@ -282,14 +371,17 @@ mod tests {
         let board = &DetailedTestBoard { grid: grid_points };
         let piece = &MoveGraph::<u32>::from(create_piece_simple("{[1,0]/,[1,1]}|-^*").unwrap());
         let start_position = (1, 1);
-
+        println!("{:?}", petgraph::dot::Dot::with_config(&(piece.graph), &[]));
         let points = points_r
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         //piece should not be able to reach into the island due to blockages
         let invalids: Vec<(i32, i32)> = points
-            .filter(|p| !check_move(piece, board, start_position, *p).is_some())
+            .filter(|p| {
+                println!("Calculating: {:?}", p);
+                !check_move(piece, board, start_position, *p).is_some()
+            })
             .collect();
 
         assert_eq!(invalids, vec![(4, 4)])

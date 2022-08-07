@@ -101,7 +101,7 @@ where
             let mut mods: Vec<Mod> = Vec::new();
             while matches!(
                 input.peek(),
-                Some((_, '|')) | Some((_, '/')) | Some((_, '-')) | Some((_, '^'))
+                Some((_, '|')) | Some((_, '/')) | Some((_, '-')) | Some((_, '^')) |Some((_,'?'))
             ) {
                 let modifier = parse_mod(input)?;
                 mods.push(modifier);
@@ -126,6 +126,7 @@ where
         Some((_, '/')) => Ok(Mod::DiagonalMirror),
         Some((_, '-')) => Ok(Mod::HorizontalMirror),
         Some((_, '^')) => parse_exponentiation_modifier(input),
+        Some((_, '?')) => Ok(Mod::ExponentiateRange(0,1)), //? is syntactical sugar for ^[0..1]
         Some((idx, c)) => Err(ParsingError::ExpectedCharacter(
             vec!["|", "/", "-", "^"],
             c,

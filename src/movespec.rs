@@ -157,8 +157,8 @@ where
             }
             MoveCompact::Sequence(seq) => {
                 let mut tail_idx = self.graph.add_node(());
-
-                let head_idx: NodeIndex<Ix> = seq
+                 
+                 let head_idx=seq
                     .iter()
                     .map(|s| {
                         let (h, t) = self.build_from_node(s);
@@ -167,9 +167,8 @@ where
                         //get new tail
                         tail_idx = t;
                         h
-                    })
-                    .next()
-                    .unwrap_or(tail_idx);
+                    }).collect::<Vec<NodeIndex<Ix>>>()[0];
+                    
 
                 (head_idx, tail_idx)
             }
@@ -196,7 +195,13 @@ where
                 (*mov).clone(),
             ])),
             Mod::Exponentiate(exp) => {
-                if *exp == 1 {
+                if *exp == 0{
+                    let h = self.graph.add_node(());
+                    let t = self.graph.add_node(());
+                    self.graph.add_edge(h, t, EdgeType::DummyRequired);
+                    (h,t)
+                }
+                else if *exp == 1 {
                     self.build_from_node(mov)
                 } else {
                     let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(exp - 1));
@@ -208,7 +213,6 @@ where
             Mod::ExponentiateRange(min, max) => {
                 let head = self.graph.add_node(());
                 let tail = self.graph.add_node(());
-
                 for exp in *min..=*max {
                     let (h, t) = self.build_from_mod(mov, &Mod::Exponentiate(exp));
 
@@ -224,6 +228,8 @@ where
                 (head, tail)
             }
             Mod::ExponentiateInfinite(min) => {
+
+                
                 //TODO do we have to use 1 as a guard value? Let's turn it into its own function, no?
                 if *min == 1 {
                     let (loop_back, t) = self.build_from_node(&*mov);

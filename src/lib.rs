@@ -209,6 +209,8 @@ pub fn create_piece_simple(s: &str) -> Result<MoveCompact, PieceCreationError> {
 #[cfg(test)]
 mod tests {
 
+    use std::vec;
+
     use crate::{check_move, create_piece_simple, movespec::MoveGraph};
 
     struct TestBoard {
@@ -239,7 +241,6 @@ mod tests {
     fn knight() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
         let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]|-/").unwrap());
-        println!("{:?}", petgraph::dot::Dot::with_config(&(k.graph), &[]));
         let start_position = (4, 4);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -302,7 +303,6 @@ mod tests {
     fn knightrider() {
         let board = &TestBoard { x_max: 8, y_max: 8 };
         let k = &MoveGraph::<u32>::from(create_piece_simple("[1,2]^*|-/").unwrap());
-        println!("{:?}", petgraph::dot::Dot::with_config(&(k.graph), &[]));
         let start_position = (2, 2);
 
         let points_r = (0..=8).collect::<Vec<i32>>();
@@ -312,10 +312,7 @@ mod tests {
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| {
-                println!("Calculating: {:?}", p);
-                check_move(k, board, start_position, *p).is_some()
-            })
+            .filter(|p| check_move(k, board, start_position, *p).is_some())
             .collect();
 
         assert_eq!(
@@ -371,20 +368,56 @@ mod tests {
         let board = &DetailedTestBoard { grid: grid_points };
         let piece = &MoveGraph::<u32>::from(create_piece_simple("{[1,0]/,[1,1]}|-^*").unwrap());
         let start_position = (1, 1);
-        println!("{:?}", petgraph::dot::Dot::with_config(&(piece.graph), &[]));
         let points = points_r
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         //piece should not be able to reach into the island due to blockages
         let invalids: Vec<(i32, i32)> = points
-            .filter(|p| {
-                println!("Calculating: {:?}", p);
-                !check_move(piece, board, start_position, *p).is_some()
-            })
+            .filter(|p| !check_move(piece, board, start_position, *p).is_some())
             .collect();
 
         assert_eq!(invalids, vec![(4, 4)])
+    }
+
+    #[test]
+    fn skirmisher() {
+        //a knight that can optionally make a single hop forwards
+        for s in vec!["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
+            //thse two pieces should be the same, just syntactcial sugar
+            let k = create_piece_simple(s).unwrap();
+            let piece = &MoveGraph::<u32>::from(k);
+            let start_position = (1, 1);
+
+            let points_r = (0..=9).collect::<Vec<i32>>();
+            let grid_points = points_r
+                .iter()
+                .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
+                .filter(|x| !matches!(x, (2, 3) | (3, 3)))
+                .collect::<Vec<(i32, i32)>>();
+
+            let board = &DetailedTestBoard { grid: grid_points };
+
+            let points = points_r
+                .iter()
+                .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
+            let valids: Vec<(i32, i32)> = points
+                .filter(|p| check_move(piece, board, start_position, *p).is_some())
+                .collect();
+
+            assert_eq!(
+                valids,
+                vec![
+                    (0, 3),
+                    (0, 4),
+                    (2, 3),
+                    (3, 0),
+                    (3, 1),
+                    (3, 2),
+                    (3, 3) //can't go to (2,4) due to blocked (2,3)
+                ]
+            )
+        }
     }
 
     //TODO make sure to test something convoluted like two infinite exponentiations nested
@@ -392,4 +425,6 @@ mod tests {
     //TODO try a knightrider that is blocked at one point and therefore can't reach subsequent positions
 
     //TODO need exponentiation starting at 0 to represent truly optional moves. and a ? sugar for ^0..1, perhaps
+
+    //TODO test ^[0..*] exponentiation
 }

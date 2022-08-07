@@ -68,6 +68,8 @@ We should also be able to input a range of values for eexponentiation. This woul
 
 Note that this is *not* the same as `{[1,1],[-1,1],[1,-1],[-1,-1]}^[1..4]`:
 
+There is also syntactical sugar for the `^[0..1]` exponent range; this is the question mark.
+
 #### Exponentiation wildcards
 What must the degree of exponentiation be for a piece that can make moves indevinately? Infinitely, of course! (Of course, we could use the size of the board to inform the degree, but this would preclude making use of the piece definition in a game with a larger board.) Therfore, we should allow the upper bound of the exponentoiation range be `*`, which means that the expression `m^[x..*]` will caluclate `{m^x,m^x+1,m^x+2.....}`. Note this set has infinite items, which must be accounted for by the evalutor.
 

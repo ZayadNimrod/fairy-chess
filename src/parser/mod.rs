@@ -49,6 +49,7 @@ pub enum ParsingError {
     UnexpectedEOF(),
     NotAValidExponent(TryFromIntError, i32, usize), //Given exponent <int> at index <char> is not valid
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
+    NotAValidJump(),//[0,0] is not a valid jump
 }
 
 pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
@@ -290,6 +291,8 @@ where
         Some((idx, c)) => return Err(ParsingError::ExpectedCharacter(vec!["]"], c, idx)),
     };
 
+    if first_int==0 && second_int==0{return Err(ParsingError::NotAValidJump());}
+
     Ok(Jump {
         x: first_int,
         y: second_int,
@@ -407,20 +410,14 @@ mod tests {
         let knight = parse_string("[e,1]/|-");
         match knight.err().unwrap() {
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 1),
-            crate::parser::ParsingError::ExpectedEOF(_) => assert!(false),
-            crate::parser::ParsingError::UnexpectedEOF() => assert!(false),
-            crate::parser::ParsingError::NotAValidExponent(_, _, _) => assert!(false),
-            crate::parser::ParsingError::IntegerParsingError(_, _) => assert!(false),
+            _ => assert!(false),
         }        
         let knight = parse_string("[2.2,1]/|-");
         assert!(knight.is_err());
         //println!("{:?}",knight);
         match knight.unwrap_err(){
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i,2), //the decimal point should cause an error
-            crate::parser::ParsingError::ExpectedEOF(_) => assert!(false),
-            crate::parser::ParsingError::UnexpectedEOF() => assert!(false),
-            crate::parser::ParsingError::NotAValidExponent(_, _, _) => assert!(false),
-            crate::parser::ParsingError::IntegerParsingError(_, _) => assert!(true),
+            _ => assert!(false),
         }
     }
 

@@ -390,4 +390,6 @@ mod tests {
     //TODO make sure to test something convoluted like two infinite exponentiations nested
 
     //TODO try a knightrider that is blocked at one point and therefore can't reach subsequent positions
+
+    //TODO need exponentiation starting at 0 to represent truly optional moves. and a ? sugar for ^0..1, perhaps
 }

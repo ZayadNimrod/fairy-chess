@@ -3,8 +3,11 @@ mod parser;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
+use petgraph::adj::EdgeIndex;
+use petgraph::stable_graph::EdgeReference;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
+use petgraph::visit::NodeRef;
 
 #[derive(Debug)]
 pub enum PieceCreationError {
@@ -76,13 +79,6 @@ where
             }
         }
 
-        //if the next position is impassable, then we cannot continue on this trace; this is not a valid position to be in
-        //unless this position is the target position; which it isn't, otherwise we would have retarned in the previous block
-        //NOTE: this check breaks if we allow [0,0] moves; the parser blocks them, and the Move Graph constructor shouldn't create any
-        if board.tile_at(head.current_position) == TileState::Impassable {
-            continue;
-        }
-
         //test that this trace isn't in a loop
         if visited
             .iter()
@@ -93,39 +89,61 @@ where
             continue;
         }
 
-        let next_moves = piece
-            .all_outgoing(head.current_move)
-            .map(|(n, e)| {
-                //TODO this could be a lot simpler if we used a reverse linked list...
+        //if the next position is impassable, then we cannot continue on this trace; this is not a valid position to be in
+        //unless this position is the target position; which it isn't, otherwise we would have retarned in the previous block
+        //TODO don't like the fact that I have to collect the iterator halfway through
+        let next_moves= {
+            if board.tile_at(head.current_position) == TileState::Impassable {
+                //however, it is entirely possible that we are here but there are required dummy nodes.
+                //In which case, we can still continue on dummy nodes, but cannot on non-dummy nodes
+                //TODO impl THIS! we need an else-case here, that contains the case under this, while thsi branch needs to follow up on dummy nodes ONLY
 
-                let j = match e.weight() {
-                    movespec::EdgeType::Optional(j) => j,
-                    movespec::EdgeType::Required(j) => j,
-                    movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
-                        return MoveTrace {
-                            current_move: n,
-                            current_position: head.current_position,
-                            trace: head.trace.clone(),
-                        };
-                    }
-                };
+                piece
+                    .all_outgoing(head.current_move)
+                    .filter(|(n, e)| match e.weight() {
+                        movespec::EdgeType::Optional(_) => false,
+                        movespec::EdgeType::Required(_) => false,
+                        movespec::EdgeType::DummyOptional => true,
+                        movespec::EdgeType::DummyRequired => true,
+                    }).collect::<Vec<(NodeIndex<Ix>,EdgeReference<movespec::EdgeType,Ix>)>>()
+                    
+            } else {
+                piece
+                    .all_outgoing(head.current_move).collect::<Vec<(NodeIndex<Ix>,EdgeReference<movespec::EdgeType,Ix>)>>()
+            }
+        }.iter().map(|(n, e)| {
+            //TODO this could be a lot simpler if we used a reverse linked list...
 
-                let mut new_trace = head.trace.clone();
-
-                new_trace.push((
-                    head.current_position.0,
-                    head.current_position.1,
-                    head.current_move,
-                ));
-
-                let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
-                MoveTrace {
-                    current_move: n,
-                    current_position: new_position,
-                    trace: new_trace,
+            let j = match e.weight() {
+                movespec::EdgeType::Optional(j) => j,
+                movespec::EdgeType::Required(j) => j,
+                movespec::EdgeType::DummyOptional
+                | movespec::EdgeType::DummyRequired => {
+                    return MoveTrace {
+                        current_move: *n,
+                        current_position: head.current_position,
+                        trace: head.trace.clone(),
+                    };
                 }
-            })
-            .collect::<Vec<MoveTrace<Ix>>>();
+            };
+
+            let mut new_trace = head.trace.clone();
+
+            new_trace.push((
+                head.current_position.0,
+                head.current_position.1,
+                head.current_move,
+            ));
+
+            let new_position =
+                (head.current_position.0 + j.x, head.current_position.1 + j.y);
+            MoveTrace {
+                current_move: *n,
+                current_position: new_position,
+                trace: new_trace,
+            }
+        })
+        .collect();
 
         //eagerly follow Dummy edges. We need to do this, otherwise, we will prematurely stop following the trace due to the impassability check.
         //Consider a choice that is the last in the move sequence, that reaches the target position, which is impassable.
@@ -380,23 +398,23 @@ mod tests {
         assert_eq!(invalids, vec![(4, 4)])
     }
 
+    // testing ^[0..*] exponentiation
     #[test]
     fn skirmisher() {
+        let points_r = (0..=9).collect::<Vec<i32>>();
+        let grid_points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
+            .filter(|x| !matches!(x, (2, 3) | (3, 3)))
+            .collect::<Vec<(i32, i32)>>();
+
+        let board = &DetailedTestBoard { grid: grid_points };
         //a knight that can optionally make a single hop forwards
         for s in vec!["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
             //thse two pieces should be the same, just syntactcial sugar
             let k = create_piece_simple(s).unwrap();
             let piece = &MoveGraph::<u32>::from(k);
             let start_position = (1, 1);
-
-            let points_r = (0..=9).collect::<Vec<i32>>();
-            let grid_points = points_r
-                .iter()
-                .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
-                .filter(|x| !matches!(x, (2, 3) | (3, 3)))
-                .collect::<Vec<(i32, i32)>>();
-
-            let board = &DetailedTestBoard { grid: grid_points };
 
             let points = points_r
                 .iter()
@@ -420,11 +438,55 @@ mod tests {
         }
     }
 
+    //a knightrider that is blocked at some points and therefore can't reach subsequent positions
+    #[test]
+    fn blocked_knightrider() {
+        let piece = &MoveGraph::<u32>::from(create_piece_simple("[1,2]^*/|-").unwrap());
+
+        let points_r = (0..=13).collect::<Vec<i32>>();
+        let grid_points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
+            .filter(|x| !matches!(x, (9, 7) | (11, 12) | (3, 13) | (3, 8))) //blocking pieces on (9,7),(11,12),(3,13),(3,8)
+            .collect::<Vec<(i32, i32)>>();
+
+        let board = &DetailedTestBoard { grid: grid_points };
+
+        let start_position = (5, 9);
+
+        let points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
+        let valids: Vec<(i32, i32)> = points
+            .filter(|p| check_move(piece, board, start_position, *p).is_some())
+            .collect();
+
+        assert_eq!(
+            valids,
+            vec![
+                (1, 1),
+                (1, 11),
+                (2, 3),
+                (3, 5),
+                (3, 8),
+                (3, 10),
+                (3, 13),
+                (4, 7),
+                (4, 11),
+                (6, 7),
+                (6, 11),
+                (7, 5),
+                (7, 8),
+                (7, 10),
+                (7, 13),
+                (8, 3),
+                (9, 1),
+                (9, 7),
+                (9, 11),
+                (11, 12) //can't reach (1,7),(11,6),(13,5),(13,13) due to blocking tiles
+            ] //TODO can't reach the blocking tiles, for some reason???
+        )
+    }
+
     //TODO make sure to test something convoluted like two infinite exponentiations nested
-
-    //TODO try a knightrider that is blocked at one point and therefore can't reach subsequent positions
-
-    //TODO need exponentiation starting at 0 to represent truly optional moves. and a ? sugar for ^0..1, perhaps
-
-    //TODO test ^[0..*] exponentiation
 }

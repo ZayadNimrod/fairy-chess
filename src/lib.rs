@@ -3,11 +3,9 @@ mod parser;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
-use petgraph::adj::EdgeIndex;
 use petgraph::stable_graph::EdgeReference;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
-use petgraph::visit::NodeRef;
 
 #[derive(Debug)]
 pub enum PieceCreationError {
@@ -96,11 +94,10 @@ where
             if board.tile_at(head.current_position) == TileState::Impassable {
                 //however, it is entirely possible that we are here but there are required dummy nodes.
                 //In which case, we can still continue on dummy nodes, but cannot on non-dummy nodes
-                //TODO impl THIS! we need an else-case here, that contains the case under this, while thsi branch needs to follow up on dummy nodes ONLY
 
                 piece
                     .all_outgoing(head.current_move)
-                    .filter(|(n, e)| match e.weight() {
+                    .filter(|(_, e)| match e.weight() {
                         movespec::EdgeType::Optional(_) => false,
                         movespec::EdgeType::Required(_) => false,
                         movespec::EdgeType::DummyOptional => true,
@@ -484,7 +481,7 @@ mod tests {
                 (9, 7),
                 (9, 11),
                 (11, 12) //can't reach (1,7),(11,6),(13,5),(13,13) due to blocking tiles
-            ] //TODO can't reach the blocking tiles, for some reason???
+            ]
         )
     }
 

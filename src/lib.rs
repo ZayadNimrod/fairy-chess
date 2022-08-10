@@ -3,9 +3,9 @@ mod parser;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
-use petgraph::stable_graph::EdgeReference;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
+use petgraph::stable_graph::EdgeReference;
 
 #[derive(Debug)]
 pub enum PieceCreationError {
@@ -90,7 +90,7 @@ where
         //if the next position is impassable, then we cannot continue on this trace; this is not a valid position to be in
         //unless this position is the target position; which it isn't, otherwise we would have retarned in the previous block
         //TODO don't like the fact that I have to collect the iterator halfway through
-        let next_moves= {
+        let next_moves = {
             if board.tile_at(head.current_position) == TileState::Impassable {
                 //however, it is entirely possible that we are here but there are required dummy nodes.
                 //In which case, we can still continue on dummy nodes, but cannot on non-dummy nodes
@@ -102,20 +102,22 @@ where
                         movespec::EdgeType::Required(_) => false,
                         movespec::EdgeType::DummyOptional => true,
                         movespec::EdgeType::DummyRequired => true,
-                    }).collect::<Vec<(NodeIndex<Ix>,EdgeReference<movespec::EdgeType,Ix>)>>()
-                    
+                    })
+                    .collect::<Vec<(NodeIndex<Ix>, EdgeReference<movespec::EdgeType, Ix>)>>()
             } else {
                 piece
-                    .all_outgoing(head.current_move).collect::<Vec<(NodeIndex<Ix>,EdgeReference<movespec::EdgeType,Ix>)>>()
+                    .all_outgoing(head.current_move)
+                    .collect::<Vec<(NodeIndex<Ix>, EdgeReference<movespec::EdgeType, Ix>)>>()
             }
-        }.iter().map(|(n, e)| {
+        }
+        .iter()
+        .map(|(n, e)| {
             //TODO this could be a lot simpler if we used a reverse linked list...
 
             let j = match e.weight() {
                 movespec::EdgeType::Optional(j) => j,
                 movespec::EdgeType::Required(j) => j,
-                movespec::EdgeType::DummyOptional
-                | movespec::EdgeType::DummyRequired => {
+                movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
                     return MoveTrace {
                         current_move: *n,
                         current_position: head.current_position,
@@ -132,8 +134,7 @@ where
                 head.current_move,
             ));
 
-            let new_position =
-                (head.current_position.0 + j.x, head.current_position.1 + j.y);
+            let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
             MoveTrace {
                 current_move: *n,
                 current_position: new_position,
@@ -485,5 +486,33 @@ mod tests {
         )
     }
 
-    //TODO make sure to test something convoluted like two infinite exponentiations nested
+    #[test]
+    fn convoluted() {
+        let piece =
+            &MoveGraph::<u32>::from(create_piece_simple("([2,2]^[2..*]-|/*[0,-4])^*").unwrap());
+
+        //println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
+        //println!("head:{:?}",piece.head());
+        let points_r = (-1..=11).collect::<Vec<i32>>();
+        let grid_points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
+            .filter(|x| !matches!(x, (1, 9) | (3, 11) | (5, 1) | (5, 9) | (9, 1) | (11, 7))) //blocking pieces
+            .collect::<Vec<(i32, i32)>>();
+
+        let board = &DetailedTestBoard { grid: grid_points };
+
+        let start_position = (7, 3);
+
+        let points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
+        let valids: Vec<(i32, i32)> = points
+            .filter(|p| check_move(piece, board, start_position, *p).is_some())
+            .collect();
+
+        println!("{:?}", check_move(piece, board, start_position, (1, 1)));
+
+        assert_eq!(valids, vec![(-1, 3), (3, 3), (7, 3), (9, 5), (11, 7)])
+    }
 }

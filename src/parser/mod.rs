@@ -3,7 +3,6 @@ use std::{iter::Peekable, num::TryFromIntError, vec};
 use peeking_take_while::PeekableExt;
 
 mod deflator;
-use deflator::Deflatable;
 
 #[derive(Debug, PartialEq,Clone)]
 pub enum Mod {
@@ -62,7 +61,7 @@ pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, Parsing
     let r = parse_seq(&mut a);
     match r {
         Ok(ast) => {match a.next() {
-            None => Ok(ast.deflate()),
+            None => Ok(crate::movespec::MoveCompact::from(ast)),
             Some((idx, _)) => Err(ParsingError::ExpectedEOF(idx)), //check that the whole string was consumed.
         }},
         Err(e) => Err(e),

@@ -40,7 +40,6 @@ pub struct Jump {
 }
 
 
-//TODO the [0,0] move needs to be specifically illegal, as should nonpositive and zero exponents!
 #[derive(Debug, PartialEq)]
 pub enum ParsingError {
     ExpectedCharacter(Vec<&'static str>, char, usize), //expected <str or str or str...>, got <char>, at index <usize>
@@ -49,6 +48,7 @@ pub enum ParsingError {
     NotAValidExponent(TryFromIntError, i32, usize), //Given exponent <int> at index <char> is not valid
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
     NotAValidJump(),//[0,0] is not a valid jump
+    UpperExpLessThanLower(usize,usize)//upper bound <usize_2> in exponent range is less than the lower bound <usize_1>
 }
 
 pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
@@ -180,7 +180,11 @@ where
             | (_, '8')
             | (_, '9') => {
                 //finite range
+               
                 let upper = parse_usize(input)?;
+                if upper<=lower {
+                    return Err(ParsingError::UpperExpLessThanLower(lower,upper));
+                }
                 match input.next() {
                     Some((_, ']')) => Ok(Mod::ExponentiateRange(lower, upper)),
                     None => Err(ParsingError::UnexpectedEOF()),
@@ -425,6 +429,16 @@ mod tests {
     fn jump_parsing(){
         //0,0 shouldn't be allowed to parse!
         let i = parse_string("[0,0]");
+        assert!(i.is_err());
+    }
+
+    #[test]
+    fn exp_parsing(){
+        //negative exp shouldn't be allowed to parse!
+        let i = parse_string("[1,0]^[-1..2]");
+        assert!(i.is_err());
+        
+        let i = parse_string("[1,0]^[1.2..2.4]");
         assert!(i.is_err());
     }
 }

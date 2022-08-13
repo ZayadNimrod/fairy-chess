@@ -1,8 +1,10 @@
 use std::iter::Zip;
 
 use petgraph;
+use petgraph::adj::EdgeIndex;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
+use petgraph::stable_graph::EdgeReference;
 use petgraph::visit::EdgeRef;
 use petgraph::visit::IntoEdges;
 use petgraph::visit::IntoNeighbors;
@@ -108,6 +110,7 @@ where
         };
         let (h, _) = r.build_from_node(&input);
         r.head = h;
+        r.deflate();
         r
     }
 }
@@ -157,8 +160,8 @@ where
             }
             MoveCompact::Sequence(seq) => {
                 let mut tail_idx = self.graph.add_node(());
-                 
-                 let head_idx=seq
+
+                let head_idx = seq
                     .iter()
                     .map(|s| {
                         let (h, t) = self.build_from_node(s);
@@ -167,8 +170,8 @@ where
                         //get new tail
                         tail_idx = t;
                         h
-                    }).collect::<Vec<NodeIndex<Ix>>>()[0];
-                    
+                    })
+                    .collect::<Vec<NodeIndex<Ix>>>()[0];
 
                 (head_idx, tail_idx)
             }
@@ -195,13 +198,12 @@ where
                 (*mov).clone(),
             ])),
             Mod::Exponentiate(exp) => {
-                if *exp == 0{
+                if *exp == 0 {
                     let h = self.graph.add_node(());
                     let t = self.graph.add_node(());
                     self.graph.add_edge(h, t, EdgeType::DummyRequired);
-                    (h,t)
-                }
-                else if *exp == 1 {
+                    (h, t)
+                } else if *exp == 1 {
                     self.build_from_node(mov)
                 } else {
                     let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(exp - 1));
@@ -216,37 +218,15 @@ where
                 for exp in *min..=*max {
                     let (h, t) = self.build_from_mod(mov, &Mod::Exponentiate(exp));
 
-                    /*
-                    //merge hs into head, and ts and into tail
-                    self.merge(head, h);
-                    self.merge(tail, t);
-                    */
-
                     self.graph.add_edge(head, h, EdgeType::DummyRequired);
                     self.graph.add_edge(t, tail, EdgeType::DummyRequired);
                 }
                 (head, tail)
             }
             Mod::ExponentiateInfinite(min) => {
-
-                
                 //TODO do we have to use 1 as a guard value? Let's turn it into its own function, no?
                 if *min == 1 {
                     let (loop_back, t) = self.build_from_node(&*mov);
-
-                    /*let to_make_optional: Vec<(NodeIndex<Ix>, EdgeType)> = self.graph
-                                .edges_directed(t, EdgeDirection::Incoming)
-                                .map(|r| (r.source(), *r.weight()))
-                                .collect();
-
-                    for (source, e) in to_make_optional {
-                        //self.graph.update_edge(source, t, (EdgeType::Optional,j));
-                        match e {
-                            EdgeType::Optional(j) => self.graph.add_edge(source, loop_back, EdgeType::Optional(j)),
-                            EdgeType::Required(j) => self.graph.add_edge(source, loop_back, EdgeType::Required(j)),
-                            EdgeType::Dummy => self.graph.add_edge(source, loop_back, EdgeType::Dummy),
-                        };
-                    }*/
                     self.graph.add_edge(t, loop_back, EdgeType::DummyOptional);
                     (loop_back, t)
                 } else {
@@ -309,5 +289,41 @@ where
 
     pub fn head(&self) -> NodeIndex<Ix> {
         self.head
+    }
+
+    ///deflate the graph by removing superfluous nodes
+    pub fn deflate(&mut self) {
+        loop {
+            //Find a reason to merge nodes
+
+            //Reason 1: if there is only one outgoing edge, and it is a dummy type, we can merge the nodes
+            let mut es = self.graph.node_indices().filter_map(|n| {
+                let es: Vec<EdgeReference<EdgeType, Ix>> = self.outgoing_edges(n).collect();
+                if es.len() == 1 {
+                    let e = es[0];
+                    return match e.weight() {
+                        EdgeType::Optional(_) => None,
+                        EdgeType::Required(_) => None,
+                        EdgeType::DummyOptional => None,
+                        EdgeType::DummyRequired => Some((e.source(), e.target())),
+                    };
+                }
+                None
+            });
+
+            match es.next() {
+                Some((s, t)) => {
+                    //TODO becuase there is an edge between the two nodes, this is kept during merging.#
+                    self.graph.remove_edge(self.graph.find_edge(s, t).unwrap());
+                    self.merge(s, t);
+                    continue;
+                }
+                None => {}
+            }
+
+            break;
+        }
+
+        //println!("{:?}", petgraph::dot::Dot::with_config(&self.graph, &[]))
     }
 }

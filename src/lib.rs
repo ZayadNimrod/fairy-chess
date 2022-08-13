@@ -494,8 +494,8 @@ pub mod tests {
     fn convoluted() {
         let piece = &MoveGraph::<u32>::from(create_piece("([2,2]^[2..*]-|/*[0,-4])^*").unwrap());
 
-        println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
-        println!("head:{:?}", piece.head());
+        //println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
+        //println!("head:{:?}", piece.head());
         let points_r = (-1..=11).collect::<Vec<i32>>();
         let grid_points = points_r
             .iter()
@@ -514,7 +514,7 @@ pub mod tests {
             .filter(|p| check_move(piece, board, start_position, *p).is_some())
             .collect();
 
-        println!("{:?}", check_move(piece, board, start_position, (1, 1)));
+        //println!("{:?}", check_move(piece, board, start_position, (1, 1)));
 
         assert_eq!(valids, vec![(-1, 3), (3, 3), (7, 3), (9, 5), (11, 7)])
     }

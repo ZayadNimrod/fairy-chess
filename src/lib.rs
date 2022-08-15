@@ -1,15 +1,13 @@
-
 pub mod movespec;
 mod parser;
+
+use std::rc::Rc;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::EdgeReference;
-
-
-
 
 #[derive(Debug)]
 pub enum PieceCreationError {
@@ -30,7 +28,52 @@ pub trait Board {
 pub struct MoveTrace<Ix> {
     pub current_move: NodeIndex<Ix>,
     pub current_position: (i32, i32),
-    pub trace: Vec<(i32, i32, NodeIndex<Ix>)>, //TODO should be a forking list, not a vec?
+    pub trace: Rc<Trace<(i32, i32)>>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Trace<T>
+{
+    Root,
+    Node(T, Rc<Trace<T>>),
+}
+
+impl<T> From<Trace<T>> for Vec<T>
+where T:Copy+ Default
+{
+    fn from(trace: Trace<T>) -> Self {
+        let depth :usize= {
+            let mut c:usize = 0;
+            let mut cur:&Trace<T> = &trace;
+            loop{
+                match cur {
+                    Trace::Root => break,
+                    Trace::Node(_, n) => {cur = n; c+=1;},
+                }
+                
+            }
+            c
+        };
+
+
+        let mut output = vec![T::default();depth];//TODO I'd rather not even place a value here; I'm overwriting them anyway in a second!
+        
+        let mut cur = &trace;
+        for i in (0..=depth-1).rev(){
+            match cur {
+                Trace::Root => {
+                    // should never happen
+                    panic!()
+                },
+                Trace::Node(t, n) => {
+                    output[i] = *t;
+                    cur = n;
+                },
+            }
+        }
+
+        output
+    }
 }
 
 /**
@@ -41,7 +84,7 @@ pub fn check_move<B, Ix>(
     board: &B,
     start_position: (i32, i32),
     target_position: (i32, i32),
-) -> Option<MoveTrace<Ix>>
+) -> Option<Vec<(i32,i32)>>
 where
     B: Board,
     Ix: IndexType,
@@ -57,7 +100,7 @@ where
     let mut traces: Vec<MoveTrace<Ix>> = vec![MoveTrace::<Ix> {
         current_move: piece.head(),
         current_position: start_position,
-        trace: Vec::new(),
+        trace: Rc::new(Trace::Root),
     }];
 
     let mut visited: Vec<(i32, i32, NodeIndex<Ix>)> = Vec::new();
@@ -76,7 +119,9 @@ where
                     movespec::EdgeType::DummyRequired => true,
                 })
             {
-                return Some(head);
+                return Some(Vec::<(i32,i32)>::from(
+                    Trace::Node(head.current_position,head.trace))                    
+                ); 
             }
         }
 
@@ -129,12 +174,12 @@ where
                 }
             };
 
-            let mut new_trace = head.trace.clone();
+           
 
-            new_trace.push((
-                head.current_position.0,
-                head.current_position.1,
-                head.current_move,
+            let new_trace= Rc::new (Trace::Node(
+                (head.current_position.0,
+                head.current_position.1),
+                head.trace.clone(),
             ));
 
             let new_position = (head.current_position.0 + j.x, head.current_position.1 + j.y);
@@ -254,7 +299,9 @@ pub mod tests {
     fn knight_t() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
         let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
-        assert!(check_move(k, board, (4, 4), (5, 6)).is_some());
+        let result = check_move(k, board, (4, 4), (5, 6));
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(),[(4,4),(5,6)])
     }
 
     #[test]

@@ -1,7 +1,6 @@
 use std::iter::Zip;
 
 use petgraph;
-use petgraph::adj::EdgeIndex;
 use petgraph::graph::IndexType;
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::EdgeReference;

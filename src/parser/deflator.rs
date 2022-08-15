@@ -43,7 +43,7 @@ impl From<parser::PieceOption> for MoveCompact {
             parser::PieceOption::Options(moves) => {
                 let choices = moves
                     .into_iter()
-                    .map(|x| MoveCompact::from(x))
+                    .map( MoveCompact::from)
                     .flat_map(|x| match x {
                         MoveCompact::Choice(c) => c,
                         _ => vec![x],

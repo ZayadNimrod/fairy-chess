@@ -8,6 +8,8 @@ use petgraph::visit::EdgeRef;
 use petgraph::visit::IntoEdges;
 use petgraph::visit::IntoNeighbors;
 use petgraph::EdgeDirection;
+use EdgeDirection::Incoming;
+use EdgeDirection::Outgoing;
 
 use crate::parser;
 pub use crate::parser::Jump;
@@ -133,7 +135,6 @@ impl<Ix> MoveGraph<Ix>
 where
     Ix: IndexType,
 {
-    //TODO we generate a bunch of dummy nodes; DELETE THEM
     fn build_from_node(&mut self, node: &MoveCompact) -> (NodeIndex<Ix>, NodeIndex<Ix>) {
         match node {
             MoveCompact::Jump(j) => {
@@ -292,35 +293,101 @@ where
 
     ///deflate the graph by removing superfluous nodes
     pub fn deflate(&mut self) {
+        //TODO this loop is probably not the most efficient way to solve this problem, tbh...
         loop {
             //Find a reason to merge nodes
 
+            let mut edge = None;
+
+            //Reason 2: If there are outgoing required dummy edges, where  the nodes these lead to have no extra incoming edges (beyond the ones to the current node)
+            //then we can merge said children nodes the the current node
+            //i.e merge multi-layer choice nodes
+
+            //TODO cannot merge a child node that has an outgoing edge to the parent! (maybe unless both edges are Dummy Required?) Otherwise, we break behaviour!
+            edge = edge.or_else(|| {
+                self.graph
+                    .node_indices()
+                    .filter_map(|n| {
+                        let mut mergable = self
+                            .outgoing_edges(n)
+                            .filter(
+                                //filter out non-dummy edges
+                                |e| match e.weight() {
+                                    EdgeType::Optional(_) => false,
+                                    EdgeType::Required(_) => false,
+                                    EdgeType::DummyOptional => false,
+                                    EdgeType::DummyRequired => true,
+                                },
+                            )
+                            .filter(
+                                //filter out child nodes that have >1 incoming edge
+                                |e| self.graph.edges_directed(e.target(), Incoming).count() == 1,
+                            )
+                            .filter(
+                                //filter out child nodes that have an edge to the parent
+                                |e| {
+                                    self.graph
+                                        .edges_directed(e.target(), Outgoing)
+                                        .all(|ed| ed.target() != e.source())
+                                },
+                            );
+
+                        //return the edges to the mergable nodes
+                        let es = mergable.map(|e| (e.source(), e.target())).collect::<Vec<(
+                            NodeIndex<Ix>,
+                            NodeIndex<Ix>,
+                        )>>(
+                        );
+                        match es.len() {
+                            0 => None,
+                            _ => Some(es),
+                        }
+                    })
+                    .next()
+                //can only merge into one node at a time, to prevent mergeing into a node that has been merged away
+            });
+            //the above could return several edges to remove at once; they should be mutually removable
+
             //Reason 1: if there is only one outgoing edge, and it is a dummy type, we can merge the nodes
-            let mut es = self.graph.node_indices().filter_map(|n| {
-                let es: Vec<EdgeReference<EdgeType, Ix>> = self.outgoing_edges(n).collect();
-                if es.len() == 1 {
-                    let e = es[0];
-                    return match e.weight() {
-                        EdgeType::Optional(_) => None,
-                        EdgeType::Required(_) => None,
-                        EdgeType::DummyOptional => None,
-                        EdgeType::DummyRequired => Some((e.source(), e.target())),
-                    };
+            edge = edge.or_else(|| {
+                let a = self
+                    .graph
+                    .node_indices()
+                    .filter_map(|n| {
+                        let es: Vec<EdgeReference<EdgeType, Ix>> = self.outgoing_edges(n).collect();
+                        if es.len() == 1 {
+                            let e = es[0];
+                            return match e.weight() {
+                                EdgeType::Optional(_) => None,
+                                EdgeType::Required(_) => None,
+                                EdgeType::DummyOptional => None,
+                                EdgeType::DummyRequired => Some((e.source(), e.target())),
+                            };
+                        }
+                        None
+                    })
+                    .take(1)
+                    //this sort of removal can only allow for one removal at a time, otherwise we may try to merge into a node that has already been deleted
+                    .collect::<Vec<(NodeIndex<Ix>, NodeIndex<Ix>)>>();
+
+                match a.len() {
+                    0 => None,
+                    _ => Some(a),
                 }
-                None
             });
 
-            match es.next() {
-                Some((s, t)) => {
-                    //TODO becuase there is an edge between the two nodes, this is kept during merging.#
-                    self.graph.remove_edge(self.graph.find_edge(s, t).unwrap());
-                    self.merge(s, t);
+            //remove an edge
+            match edge {
+                Some(vec) => {
+                    vec.into_iter().for_each(|(s, t)| {
+                        //there is an edge between the two nodes, this is kept during merging, so remove it first
+                        self.graph.remove_edge(self.graph.find_edge(s, t).unwrap());
+                        self.merge(s, t);
+                    });
                     continue;
                 }
-                None => {}
+                None => break,
             }
-
-            break;
         }
 
         //println!("{:?}", petgraph::dot::Dot::with_config(&self.graph, &[]))

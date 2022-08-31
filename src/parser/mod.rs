@@ -4,7 +4,7 @@ use peeking_take_while::PeekableExt;
 
 mod deflator;
 
-#[derive(Debug, PartialEq,Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Mod {
     HorizontalMirror,
     VerticalMirror,
@@ -39,7 +39,6 @@ pub struct Jump {
     pub y: i32,
 }
 
-
 #[derive(Debug, PartialEq)]
 pub enum ParsingError {
     ExpectedCharacter(Vec<&'static str>, char, usize), //expected <str or str or str...>, got <char>, at index <usize>
@@ -47,8 +46,8 @@ pub enum ParsingError {
     UnexpectedEOF(),
     NotAValidExponent(TryFromIntError, i32, usize), //Given exponent <int> at index <char> is not valid
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
-    NotAValidJump(),//[0,0] is not a valid jump
-    UpperExpLessThanLower(usize,usize)//upper bound <usize_2> in exponent range is less than the lower bound <usize_1>
+    NotAValidJump(),                     //[0,0] is not a valid jump
+    UpperExpLessThanLower(usize, usize), //upper bound <usize_2> in exponent range is less than the lower bound <usize_1>
 }
 
 pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
@@ -60,14 +59,14 @@ pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, Parsing
         .peekable();
     let r = parse_seq(&mut a);
     match r {
-        Ok(ast) => {match a.next() {
-            None => Ok(crate::movespec::MoveCompact::from(ast)),
-            Some((idx, _)) => Err(ParsingError::ExpectedEOF(idx)), //check that the whole string was consumed.
-        }},
+        Ok(ast) => {
+            match a.next() {
+                None => Ok(crate::movespec::MoveCompact::from(ast)),
+                Some((idx, _)) => Err(ParsingError::ExpectedEOF(idx)), //check that the whole string was consumed.
+            }
+        }
         Err(e) => Err(e),
     }
-
-    
 }
 
 fn parse_seq<T>(input: &mut Peekable<T>) -> Result<Seq, ParsingError>
@@ -100,7 +99,7 @@ where
             let mut mods: Vec<Mod> = Vec::new();
             while matches!(
                 input.peek(),
-                Some((_, '|')) | Some((_, '/')) | Some((_, '-')) | Some((_, '^')) |Some((_,'?'))
+                Some((_, '|')) | Some((_, '/')) | Some((_, '-')) | Some((_, '^')) | Some((_, '?'))
             ) {
                 let modifier = parse_mod(input)?;
                 mods.push(modifier);
@@ -125,7 +124,7 @@ where
         Some((_, '/')) => Ok(Mod::DiagonalMirror),
         Some((_, '-')) => Ok(Mod::HorizontalMirror),
         Some((_, '^')) => parse_exponentiation_modifier(input),
-        Some((_, '?')) => Ok(Mod::ExponentiateRange(0,1)), //? is syntactical sugar for ^[0..1]
+        Some((_, '?')) => Ok(Mod::ExponentiateRange(0, 1)), //? is syntactical sugar for ^[0..1]
         Some((idx, c)) => Err(ParsingError::ExpectedCharacter(
             vec!["|", "/", "-", "^"],
             c,
@@ -180,10 +179,10 @@ where
             | (_, '8')
             | (_, '9') => {
                 //finite range
-               
+
                 let upper = parse_usize(input)?;
-                if upper<=lower {
-                    return Err(ParsingError::UpperExpLessThanLower(lower,upper));
+                if upper <= lower {
+                    return Err(ParsingError::UpperExpLessThanLower(lower, upper));
                 }
                 match input.next() {
                     Some((_, ']')) => Ok(Mod::ExponentiateRange(lower, upper)),
@@ -295,7 +294,9 @@ where
         Some((idx, c)) => return Err(ParsingError::ExpectedCharacter(vec!["]"], c, idx)),
     };
 
-    if first_int==0 && second_int==0{return Err(ParsingError::NotAValidJump());}
+    if first_int == 0 && second_int == 0 {
+        return Err(ParsingError::NotAValidJump());
+    }
 
     Ok(Jump {
         x: first_int,
@@ -350,7 +351,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{parse_string};
+    use crate::parser::parse_string;
 
     #[test]
     fn jumps() {
@@ -415,30 +416,37 @@ mod tests {
         match knight.err().unwrap() {
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 1),
             _ => assert!(false),
-        }        
+        }
         let knight = parse_string("[2.2,1]/|-");
         assert!(knight.is_err());
         //println!("{:?}",knight);
-        match knight.unwrap_err(){
-            crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i,2), //the decimal point should cause an error
+        match knight.unwrap_err() {
+            crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 2), //the decimal point should cause an error
             _ => assert!(false),
         }
     }
 
     #[test]
-    fn jump_parsing(){
+    fn jump_parsing() {
         //0,0 shouldn't be allowed to parse!
         let i = parse_string("[0,0]");
         assert!(i.is_err());
     }
 
     #[test]
-    fn exp_parsing(){
+    fn exp_parsing() {
         //negative exp shouldn't be allowed to parse!
         let i = parse_string("[1,0]^[-1..2]");
         assert!(i.is_err());
-        
+
         let i = parse_string("[1,0]^[1.2..2.4]");
         assert!(i.is_err());
+    }
+
+    #[test]
+    fn allow_tabs() {
+        //TODO this isn't using proper tabs, it's spaces...
+        let knight = parse_string("[2,  1]/     |-   ");
+        assert!(knight.is_ok());
     }
 }

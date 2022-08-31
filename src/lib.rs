@@ -25,50 +25,51 @@ pub trait Board {
 }
 
 #[derive(Debug)]
-pub struct MoveTrace<Ix> {
+struct MoveTrace<Ix> {
     pub current_move: NodeIndex<Ix>,
     pub current_position: (i32, i32),
     pub trace: Rc<Trace<(i32, i32)>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Trace<T>
-{
+enum Trace<T> {
     Root,
     Node(T, Rc<Trace<T>>),
 }
 
 impl<T> From<Trace<T>> for Vec<T>
-where T:Copy+ Default
+where
+    T: Copy + Default,
 {
     fn from(trace: Trace<T>) -> Self {
-        let depth :usize= {
-            let mut c:usize = 0;
-            let mut cur:&Trace<T> = &trace;
-            loop{
+        let depth: usize = {
+            let mut c: usize = 0;
+            let mut cur: &Trace<T> = &trace;
+            loop {
                 match cur {
                     Trace::Root => break,
-                    Trace::Node(_, n) => {cur = n; c+=1;},
+                    Trace::Node(_, n) => {
+                        cur = n;
+                        c += 1;
+                    }
                 }
-                
             }
             c
         };
 
+        let mut output = vec![T::default(); depth]; //TODO I'd rather not even set a value here; I'm overwriting them anyway in a second!
 
-        let mut output = vec![T::default();depth];//TODO I'd rather not even place a value here; I'm overwriting them anyway in a second!
-        
         let mut cur = &trace;
-        for i in (0..=depth-1).rev(){
+        for i in (0..=depth - 1).rev() {
             match cur {
                 Trace::Root => {
                     // should never happen
                     panic!()
-                },
+                }
                 Trace::Node(t, n) => {
                     output[i] = *t;
                     cur = n;
-                },
+                }
             }
         }
 
@@ -76,6 +77,7 @@ where T:Copy+ Default
     }
 }
 
+//TODO why do we have Ix here? That exposes Ix to the caller, which is an internal detail : They don't use Ix anywhere else!
 /**
 Assumes that target_position is not impassable (i.e open tile with no friendly piece)
 */
@@ -84,7 +86,7 @@ pub fn check_move<B, Ix>(
     board: &B,
     start_position: (i32, i32),
     target_position: (i32, i32),
-) -> Option<Vec<(i32,i32)>>
+) -> Option<Vec<(i32, i32)>>
 where
     B: Board,
     Ix: IndexType,
@@ -119,9 +121,10 @@ where
                     movespec::EdgeType::DummyRequired => true,
                 })
             {
-                return Some(Vec::<(i32,i32)>::from(
-                    Trace::Node(head.current_position,head.trace))                    
-                ); 
+                return Some(Vec::<(i32, i32)>::from(Trace::Node(
+                    head.current_position,
+                    head.trace,
+                )));
             }
         }
 
@@ -174,11 +177,8 @@ where
                 }
             };
 
-           
-
-            let new_trace= Rc::new (Trace::Node(
-                (head.current_position.0,
-                head.current_position.1),
+            let new_trace = Rc::new(Trace::Node(
+                (head.current_position.0, head.current_position.1),
                 head.trace.clone(),
             ));
 
@@ -196,7 +196,6 @@ where
         //Becuase there is still a dummy edge ahead of it, it is not considered a finished move, so we don;t return true. Instead, we drop the trace, as we are on an impassable tile!
         //So we must eagerly follow them.
         let mut follow_up: Vec<MoveTrace<Ix>> = next_moves;
-
         //Follow up on dummy edges until there are no dummy edges left
         loop {
             let mut followed_up_on = false;
@@ -205,15 +204,15 @@ where
                 .flat_map(|mt| {
                     let hd = mt.current_move;
 
-                    //if all outgoing edges are optional (or there are no outgoing edges), stay here. Otherwise, advance!
+                    //if all outgoing edges are optional or non-dummy (or there are no outgoing edges), stay here. Otherwise, advance!
 
                     if !piece.all_outgoing(hd).any(|(_, e)| match e.weight() {
                         movespec::EdgeType::Optional(_) => true,
-                        movespec::EdgeType::Required(_) => false,
+                        movespec::EdgeType::Required(_) => true,
                         movespec::EdgeType::DummyOptional => true,
                         movespec::EdgeType::DummyRequired => false,
                     }) {
-                        //there exist at least one non-optionla egde. Therefore, we cannot stay here, so follow up required dummy edges
+                        //there exist at least one non-optional egde. Therefore, we cannot stay here, so follow up required dummy edges
                         piece
                             .all_outgoing(hd)
                             .map(|(n, e)| match e.weight() {
@@ -234,7 +233,7 @@ where
                             })
                             .collect::<Vec<MoveTrace<Ix>>>()
                     } else {
-                        //all outgoing edges are optional, so just return self; we don't *have* to advance in any way, so return the current node
+                        //all outgoing edges are optional or non-dummy, so just return self; we don't *have* to advance in any way, so return the current node
                         vec![MoveTrace {
                             current_move: hd,
                             current_position: mt.current_position,
@@ -271,7 +270,7 @@ pub fn create_piece(s: &str) -> Result<MoveCompact, PieceCreationError> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use std::vec;
 
@@ -301,7 +300,7 @@ pub mod tests {
         let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
         let result = check_move(k, board, (4, 4), (5, 6));
         assert!(result.is_some());
-        assert_eq!(result.unwrap(),[(4,4),(5,6)])
+        assert_eq!(result.unwrap(), [(4, 4), (5, 6)])
     }
 
     #[test]
@@ -447,7 +446,6 @@ pub mod tests {
         assert_eq!(invalids, vec![(4, 4)])
     }
 
-    // testing ^[0..*] exponentiation
     #[test]
     fn skirmisher() {
         let points_r = (0..=9).collect::<Vec<i32>>();
@@ -463,13 +461,19 @@ pub mod tests {
             //thse two pieces should be the same, just syntactcial sugar
             let k = create_piece(s).unwrap();
             let piece = &MoveGraph::<u32>::from(k);
+            println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
+            println!("head:{:?}", piece.head());
+
             let start_position = (1, 1);
 
             let points = points_r
                 .iter()
                 .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
             let valids: Vec<(i32, i32)> = points
-                .filter(|p| check_move(piece, board, start_position, *p).is_some())
+                .filter(|p| {
+                    println!("{:#?}", p);
+                    check_move(piece, board, start_position, *p).is_some()
+                })
                 .collect();
 
             assert_eq!(
@@ -483,7 +487,7 @@ pub mod tests {
                     (3, 2),
                     (3, 3) //can't go to (2,4) due to blocked (2,3)
                 ]
-            )
+            );
         }
     }
 
@@ -541,8 +545,8 @@ pub mod tests {
     fn convoluted() {
         let piece = &MoveGraph::<u32>::from(create_piece("([2,2]^[2..*]-|/*[0,-4])^*").unwrap());
 
-        //println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
-        //println!("head:{:?}", piece.head());
+        println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
+        println!("head:{:?}", piece.head());
         let points_r = (-1..=11).collect::<Vec<i32>>();
         let grid_points = points_r
             .iter()

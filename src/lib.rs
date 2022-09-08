@@ -76,7 +76,7 @@ where
     }
 }
 
-//TODO why do we have Ix here? That exposes Ix to the caller, which is an internal detail : They don't use Ix anywhere else!
+
 /**
 Assumes that target_position is not impassable (i.e open tile with no friendly piece)
 */
@@ -165,7 +165,6 @@ where
         }
         .iter()
         .map(|(n, e)| {
-            //TODO this could be a lot simpler if we used a reverse linked list...
 
             let j = match e.weight() {
                 movespec::EdgeType::Optional(j) => j,

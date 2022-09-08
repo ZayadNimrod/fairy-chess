@@ -1,9 +1,9 @@
 use std::iter::Zip;
 
 use petgraph;
-use petgraph::graph::{DefaultIx,NodeIndex};
+use petgraph::graph::{DefaultIx, NodeIndex};
 use petgraph::stable_graph::EdgeReference;
-use petgraph::visit::{EdgeRef,IntoEdges,IntoNeighbors};
+use petgraph::visit::{EdgeRef, IntoEdges, IntoNeighbors};
 use petgraph::EdgeDirection;
 
 use crate::parser;
@@ -215,17 +215,11 @@ impl MoveGraph {
                 (head, tail)
             }
             Mod::ExponentiateInfinite(min) => {
-                //TODO do we have to use 1 as a guard value? Let's turn it into its own function, no?
-                if *min == 1 {
-                    let (loop_back, t) = self.build_from_node(&*mov);
-                    self.graph.add_edge(t, loop_back, EdgeType::DummyOptional);
-                    (loop_back, t)
-                } else {
-                    let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(*min - 1));
-                    let (h_mid, t) = self.build_from_mod(mov, &Mod::ExponentiateInfinite(1));
-                    self.merge(h_mid, t_mid);
-                    (h, t)
-                }
+                let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(*min - 1));
+                let (h_mid, t) = self.build_from_node(&*mov);                
+                self.graph.add_edge(t, h_mid, EdgeType::DummyOptional);
+                self.merge(h_mid, t_mid);
+                (h, t)
             }
         }
     }
@@ -284,7 +278,7 @@ impl MoveGraph {
 
     ///deflate the graph by removing superfluous nodes
     pub fn deflate(&mut self) {
-        //TODO this loop is probably not the most efficient way to solve this problem, tbh...
+        //TODO this loop is probably not the most efficient way to solve this problem...
         loop {
             //Find a reason to merge nodes
 
@@ -309,7 +303,12 @@ impl MoveGraph {
                         )
                         .filter(
                             //filter out child nodes that have >1 incoming edge
-                            |e| self.graph.edges_directed(e.target(), EdgeDirection::Incoming).count() == 1,
+                            |e| {
+                                self.graph
+                                    .edges_directed(e.target(), EdgeDirection::Incoming)
+                                    .count()
+                                    == 1
+                            },
                         )
                         .filter(
                             //filter out child nodes that have an edge to the parent

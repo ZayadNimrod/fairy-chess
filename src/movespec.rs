@@ -1,15 +1,10 @@
 use std::iter::Zip;
 
 use petgraph;
-use petgraph::graph::IndexType;
-use petgraph::graph::NodeIndex;
+use petgraph::graph::{DefaultIx,NodeIndex};
 use petgraph::stable_graph::EdgeReference;
-use petgraph::visit::EdgeRef;
-use petgraph::visit::IntoEdges;
-use petgraph::visit::IntoNeighbors;
+use petgraph::visit::{EdgeRef,IntoEdges,IntoNeighbors};
 use petgraph::EdgeDirection;
-use EdgeDirection::Incoming;
-use EdgeDirection::Outgoing;
 
 use crate::parser;
 pub use crate::parser::Jump;
@@ -82,12 +77,9 @@ pub struct MoveGraphNode {
 }
 
 #[derive(Debug)]
-pub struct MoveGraph<Ix>
-where
-    Ix: IndexType,
-{
-    pub graph: petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix>,
-    head: NodeIndex<Ix>,
+pub struct MoveGraph {
+    pub graph: petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx>,
+    head: NodeIndex<DefaultIx>,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -100,14 +92,13 @@ pub enum EdgeType {
 
 //TODO do I want it to consume the MoveCompact? I can't convert back, and MoveCompact is actually serializable, unless we count the string representation- which has to be genrated from MoveCompact anyway!
 //It'll have to though, I think, that's how MoveCompact works, it owns its values...
-impl<Ix> From<MoveCompact> for MoveGraph<Ix>
-where
-    Ix: IndexType,
-{
+impl From<MoveCompact> for MoveGraph {
     fn from(input: MoveCompact) -> Self {
-        let mut r = MoveGraph::<Ix> {
-            graph: petgraph::stable_graph::StableDiGraph::<(), EdgeType, Ix>::with_capacity(0, 0),
-            head: NodeIndex::<Ix>::default(),
+        let mut r = MoveGraph {
+            graph: petgraph::stable_graph::StableDiGraph::<(), EdgeType, DefaultIx>::with_capacity(
+                0, 0,
+            ),
+            head: NodeIndex::<DefaultIx>::default(),
         };
         let (h, _) = r.build_from_node(&input);
         r.head = h;
@@ -131,11 +122,11 @@ impl MoveCompact {
     }
 }
 
-impl<Ix> MoveGraph<Ix>
-where
-    Ix: IndexType,
-{
-    fn build_from_node(&mut self, node: &MoveCompact) -> (NodeIndex<Ix>, NodeIndex<Ix>) {
+impl MoveGraph {
+    fn build_from_node(
+        &mut self,
+        node: &MoveCompact,
+    ) -> (NodeIndex<DefaultIx>, NodeIndex<DefaultIx>) {
         match node {
             MoveCompact::Jump(j) => {
                 let h = self.graph.add_node(());
@@ -171,7 +162,7 @@ where
                         tail_idx = t;
                         h
                     })
-                    .collect::<Vec<NodeIndex<Ix>>>()[0];
+                    .collect::<Vec<NodeIndex<DefaultIx>>>()[0];
 
                 (head_idx, tail_idx)
             }
@@ -183,7 +174,7 @@ where
         &mut self,
         mov: &MoveCompact,
         modifier: &Mod,
-    ) -> (NodeIndex<Ix>, NodeIndex<Ix>) {
+    ) -> (NodeIndex<DefaultIx>, NodeIndex<DefaultIx>) {
         match modifier {
             Mod::HorizontalMirror => self.build_from_node(&MoveCompact::Choice(vec![
                 mov.map(|j| Jump { x: j.x, y: -j.y }),
@@ -239,8 +230,8 @@ where
         }
     }
 
-    fn merge(&mut self, to_keep: NodeIndex<Ix>, to_drop: NodeIndex<Ix>) {
-        let drop_outgoing: Vec<(NodeIndex<Ix>, EdgeType)> = self
+    fn merge(&mut self, to_keep: NodeIndex<DefaultIx>, to_drop: NodeIndex<DefaultIx>) {
+        let drop_outgoing: Vec<(NodeIndex<DefaultIx>, EdgeType)> = self
             .graph
             .edges_directed(to_drop, EdgeDirection::Outgoing)
             .map(|r| (r.target(), *r.weight()))
@@ -250,7 +241,7 @@ where
             self.graph.add_edge(to_keep, target, weight);
         }
 
-        let drop_incoming: Vec<(NodeIndex<Ix>, EdgeType)> = self
+        let drop_incoming: Vec<(NodeIndex<DefaultIx>, EdgeType)> = self
             .graph
             .edges_directed(to_drop, EdgeDirection::Incoming)
             .map(|r| (r.source(), *r.weight()))
@@ -264,30 +255,30 @@ where
 
     pub fn successors(
         &self,
-        idx: NodeIndex<Ix>,
-    ) -> <&petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix> as IntoNeighbors>::Neighbors
+        idx: NodeIndex<DefaultIx>,
+    ) -> <&petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx> as IntoNeighbors>::Neighbors
     {
         self.graph.neighbors(idx)
     }
 
     pub fn outgoing_edges(
         &self,
-        idx: NodeIndex<Ix>,
-    ) -> <&petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix> as IntoEdges>::Edges {
+        idx: NodeIndex<DefaultIx>,
+    ) -> <&petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx> as IntoEdges>::Edges {
         self.graph.edges(idx)
     }
 
     pub fn all_outgoing(
         &self,
-        idx: NodeIndex<Ix>,
+        idx: NodeIndex<DefaultIx>,
     ) -> Zip<
-        <&petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix> as IntoNeighbors>::Neighbors,
-        <&petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix> as IntoEdges>::Edges,
-    > {
+        <&petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx> as IntoNeighbors>::Neighbors,
+        <&petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx> as IntoEdges>::Edges,
+    >{
         self.successors(idx).zip(self.outgoing_edges(idx))
     }
 
-    pub fn head(&self) -> NodeIndex<Ix> {
+    pub fn head(&self) -> NodeIndex<DefaultIx> {
         self.head
     }
 
@@ -303,47 +294,41 @@ where
             //then we can merge said children nodes the the current node
             //i.e merge multi-layer choice nodes
 
-            //TODO cannot merge a child node that has an outgoing edge to the parent! (maybe unless both edges are Dummy Required?) Otherwise, we break behaviour!
             edge = edge.or_else(|| {
-                self.graph
-                    .node_indices()
-                    .filter_map(|n| {
-                        let mut mergable = self
-                            .outgoing_edges(n)
-                            .filter(
-                                //filter out non-dummy edges
-                                |e| match e.weight() {
-                                    EdgeType::Optional(_) => false,
-                                    EdgeType::Required(_) => false,
-                                    EdgeType::DummyOptional => false,
-                                    EdgeType::DummyRequired => true,
-                                },
-                            )
-                            .filter(
-                                //filter out child nodes that have >1 incoming edge
-                                |e| self.graph.edges_directed(e.target(), Incoming).count() == 1,
-                            )
-                            .filter(
-                                //filter out child nodes that have an edge to the parent
-                                |e| {
-                                    self.graph
-                                        .edges_directed(e.target(), Outgoing)
-                                        .all(|ed| ed.target() != e.source())
-                                },
-                            );
-
-                        //return the edges to the mergable nodes
-                        let es = mergable.map(|e| (e.source(), e.target())).collect::<Vec<(
-                            NodeIndex<Ix>,
-                            NodeIndex<Ix>,
-                        )>>(
+                self.graph.node_indices().find_map(|n| {
+                    let mergable = self
+                        .outgoing_edges(n)
+                        .filter(
+                            //filter out non-dummy edges
+                            |e| match e.weight() {
+                                EdgeType::Optional(_) => false,
+                                EdgeType::Required(_) => false,
+                                EdgeType::DummyOptional => false,
+                                EdgeType::DummyRequired => true,
+                            },
+                        )
+                        .filter(
+                            //filter out child nodes that have >1 incoming edge
+                            |e| self.graph.edges_directed(e.target(), EdgeDirection::Incoming).count() == 1,
+                        )
+                        .filter(
+                            //filter out child nodes that have an edge to the parent
+                            |e| {
+                                self.graph
+                                    .edges_directed(e.target(), EdgeDirection::Outgoing)
+                                    .all(|ed| ed.target() != e.source())
+                            },
                         );
-                        match es.len() {
-                            0 => None,
-                            _ => Some(es),
-                        }
-                    })
-                    .next()
+
+                    //return the edges to the mergable nodes
+                    let es = mergable
+                        .map(|e| (e.source(), e.target()))
+                        .collect::<Vec<(NodeIndex<DefaultIx>, NodeIndex<DefaultIx>)>>();
+                    match es.len() {
+                        0 => None,
+                        _ => Some(es),
+                    }
+                })
                 //can only merge into one node at a time, to prevent mergeing into a node that has been merged away
             });
             //the above could return several edges to remove at once; they should be mutually removable
@@ -354,7 +339,8 @@ where
                     .graph
                     .node_indices()
                     .filter_map(|n| {
-                        let es: Vec<EdgeReference<EdgeType, Ix>> = self.outgoing_edges(n).collect();
+                        let es: Vec<EdgeReference<EdgeType, DefaultIx>> =
+                            self.outgoing_edges(n).collect();
                         if es.len() == 1 {
                             let e = es[0];
                             return match e.weight() {
@@ -368,7 +354,7 @@ where
                     })
                     .take(1)
                     //this sort of removal can only allow for one removal at a time, otherwise we may try to merge into a node that has already been deleted
-                    .collect::<Vec<(NodeIndex<Ix>, NodeIndex<Ix>)>>();
+                    .collect::<Vec<(NodeIndex<DefaultIx>, NodeIndex<DefaultIx>)>>();
 
                 match a.len() {
                     0 => None,

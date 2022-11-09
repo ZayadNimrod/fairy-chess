@@ -5,7 +5,8 @@ use std::rc::Rc;
 
 use movespec::MoveCompact;
 use movespec::MoveGraph;
-use petgraph::graph::{DefaultIx,NodeIndex};
+use parser::Jump;
+use petgraph::graph::{DefaultIx, NodeIndex};
 use petgraph::stable_graph::EdgeReference;
 
 #[derive(Debug)]
@@ -76,7 +77,6 @@ where
     }
 }
 
-
 /**
 Assumes that target_position is not impassable (i.e open tile with no friendly piece)
 */
@@ -85,6 +85,8 @@ pub fn check_move<B>(
     board: &B,
     start_position: (i32, i32),
     target_position: (i32, i32),
+    invert_x: bool,
+    invert_y: bool,
 ) -> Option<Vec<(i32, i32)>>
 where
     B: Board,
@@ -165,10 +167,9 @@ where
         }
         .iter()
         .map(|(n, e)| {
-
-            let j = match e.weight() {
-                movespec::EdgeType::Optional(j) => j,
-                movespec::EdgeType::Required(j) => j,
+            let mut j :Jump = match e.weight() {
+                movespec::EdgeType::Optional(j) => Jump{x:j.x,y:j.y},
+                movespec::EdgeType::Required(j) => Jump{x:j.x,y:j.y},
                 movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
                     return MoveTrace {
                         current_move: *n,
@@ -177,6 +178,14 @@ where
                     };
                 }
             };
+
+            if invert_x {
+                j.x = -j.x;
+            }
+
+            if invert_y {
+                j.y = -j.y;
+            }
 
             let new_trace = Rc::new(Trace::Node(
                 (head.current_position.0, head.current_position.1),
@@ -299,7 +308,7 @@ mod tests {
     fn knight_t() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
         let k = &MoveGraph::from(create_piece("[1,2]|-/").unwrap());
-        let result = check_move(k, board, (4, 4), (5, 6));
+        let result = check_move(k, board, (4, 4), (5, 6), false, false);
         assert!(result.is_some());
         assert_eq!(result.unwrap(), [(4, 4), (5, 6)])
     }
@@ -317,7 +326,7 @@ mod tests {
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(k, board, start_position, *p).is_some())
+            .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(
@@ -348,7 +357,7 @@ mod tests {
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(k, board, start_position, *p).is_some())
+            .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(
@@ -379,7 +388,7 @@ mod tests {
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(k, board, start_position, *p).is_some())
+            .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(
@@ -441,7 +450,7 @@ mod tests {
 
         //piece should not be able to reach into the island due to blockages
         let invalids: Vec<(i32, i32)> = points
-            .filter(|p| !check_move(piece, board, start_position, *p).is_some())
+            .filter(|p| !check_move(piece, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(invalids, vec![(4, 4)])
@@ -473,7 +482,7 @@ mod tests {
             let valids: Vec<(i32, i32)> = points
                 .filter(|p| {
                     println!("{:#?}", p);
-                    check_move(piece, board, start_position, *p).is_some()
+                    check_move(piece, board, start_position, *p, false, false).is_some()
                 })
                 .collect();
 
@@ -512,7 +521,7 @@ mod tests {
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(piece, board, start_position, *p).is_some())
+            .filter(|p| check_move(piece, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(
@@ -563,11 +572,56 @@ mod tests {
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(piece, board, start_position, *p).is_some())
+            .filter(|p| check_move(piece, board, start_position, *p, false, false).is_some())
             .collect();
 
         //println!("{:?}", check_move(piece, board, start_position, (1, 1)));
 
         assert_eq!(valids, vec![(-1, 3), (3, 3), (7, 3), (9, 5), (11, 7)])
+    }
+    #[test]
+    fn invert() {
+        let piece = &MoveGraph::from(create_piece("[1,1]").unwrap());
+
+        let points_r = (-1..=11).collect::<Vec<i32>>();
+        let grid_points = points_r
+            .iter()
+            .flat_map(|x| points_r.iter().map(|y| (*x, *y)))
+            .filter(|x| !matches!(x, (1, 9) | (3, 11) | (5, 1) | (5, 9) | (9, 1) | (11, 7))) //blocking pieces
+            .collect::<Vec<(i32, i32)>>();
+
+        let board = &DetailedTestBoard { grid: grid_points };
+
+        let start_position = (6, 3);
+
+        assert!(check_move(piece, board, start_position, (7, 4), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 4), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 4), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (7, 3), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 3), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 3), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (7, 2), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 2), false, false).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 2), false, false).is_some());
+
+        assert!(!check_move(piece, board, start_position, (7, 4), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 4), true, false).is_some());
+        assert!(check_move(piece, board, start_position, (5, 4), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (7, 3), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 3), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 3), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (7, 2), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 2), true, false).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 2), true, false).is_some());
+
+        assert!(!check_move(piece, board, start_position, (7, 4), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 4), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 4), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (7, 3), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 3), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 3), false, true).is_some());
+        assert!(check_move(piece, board, start_position, (7, 2), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (6, 2), false, true).is_some());
+        assert!(!check_move(piece, board, start_position, (5, 2), false, true).is_some());
     }
 }

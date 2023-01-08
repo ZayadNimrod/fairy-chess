@@ -1,5 +1,7 @@
 # Fairy Chess notation
 
+TODO yet to add images. Once [the web game](https://github.com/ZayadNimrod/fairy-chess-com) is completed, I can use it to create the images.
+
 ## Informal introduction
 
 ### Jumps

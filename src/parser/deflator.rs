@@ -35,7 +35,7 @@ impl From<parser::Modded> for MoveCompact {
     }
 }
 
-impl From<parser::PieceOption> for MoveCompact {   
+impl From<parser::PieceOption> for MoveCompact {
     fn from(this: parser::PieceOption) -> Self {
         match this {
             parser::PieceOption::Jump(j) => MoveCompact::Jump(j),
@@ -43,7 +43,7 @@ impl From<parser::PieceOption> for MoveCompact {
             parser::PieceOption::Options(moves) => {
                 let choices = moves
                     .into_iter()
-                    .map( MoveCompact::from)
+                    .map(MoveCompact::from)
                     .flat_map(|x| match x {
                         MoveCompact::Choice(c) => c,
                         _ => vec![x],

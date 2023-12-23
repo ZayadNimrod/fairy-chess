@@ -167,9 +167,9 @@ where
         }
         .iter()
         .map(|(n, e)| {
-            let mut j :Jump = match e.weight() {
-                movespec::EdgeType::Optional(j) => Jump{x:j.x,y:j.y},
-                movespec::EdgeType::Required(j) => Jump{x:j.x,y:j.y},
+            let mut j: Jump = match e.weight() {
+                movespec::EdgeType::Optional(j) => Jump { x: j.x, y: j.y },
+                movespec::EdgeType::Required(j) => Jump { x: j.x, y: j.y },
                 movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
                     return MoveTrace {
                         current_move: *n,

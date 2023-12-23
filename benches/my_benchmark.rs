@@ -1,8 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-
-
-
 fn knight_t_bench(c: &mut Criterion) {
     c.bench_function("knight_t", |b| b.iter(|| knight_t()));
 }
@@ -28,8 +25,17 @@ fn convoluted_bench(c: &mut Criterion) {
     c.bench_function("convoluted", |b| b.iter(|| convoluted()));
 }
 
-
-criterion_group!(benches, knight_t_bench,knight_bench,knight_offset_bench,knightrider_bench,infinte_king_bench,skirmisher_bench,blocked_knightrider_bench,convoluted_bench);
+criterion_group!(
+    benches,
+    knight_t_bench,
+    knight_bench,
+    knight_offset_bench,
+    knightrider_bench,
+    infinte_king_bench,
+    skirmisher_bench,
+    blocked_knightrider_bench,
+    convoluted_bench
+);
 criterion_main!(benches);
 
 //copied from the tests in the main crate
@@ -303,7 +309,6 @@ fn convoluted() {
     let valids: Vec<(i32, i32)> = points
         .filter(|p| check_move(piece, board, start_position, *p).is_some())
         .collect();
-
 
     assert_eq!(valids, vec![(-1, 3), (3, 3), (7, 3), (9, 5), (11, 7)])
 }

@@ -58,6 +58,27 @@ impl MoveCompact {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for MoveCompact {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.notation())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for MoveCompact {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.try_into().map_err(serde::de::Error::custom)
+    }
+}
+
 impl From<MoveCompact> for String {
     fn from(m: MoveCompact) -> Self {
         m.notation()
@@ -216,7 +237,7 @@ impl MoveGraph {
             }
             Mod::ExponentiateInfinite(min) => {
                 let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(*min - 1));
-                let (h_mid, t) = self.build_from_node(&*mov);                
+                let (h_mid, t) = self.build_from_node(&*mov);
                 self.graph.add_edge(t, h_mid, EdgeType::DummyOptional);
                 self.merge(h_mid, t_mid);
                 (h, t)

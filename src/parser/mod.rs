@@ -1,6 +1,7 @@
 use std::{iter::Peekable, num::TryFromIntError, vec};
 
 use peeking_take_while::PeekableExt;
+use thiserror::Error;
 
 mod deflator;
 
@@ -39,15 +40,25 @@ pub struct Jump {
     pub y: i32,
 }
 
-#[derive(Debug, PartialEq)]
+// TODO add positions where the error occurred to all errors
+#[derive(Debug, PartialEq, Error)]
 pub enum ParsingError {
-    ExpectedCharacter(Vec<&'static str>, char, usize), //expected <str or str or str...>, got <char>, at index <usize>
-    ExpectedEOF(usize), //parsing ended at character <usize>, but the string is not ended
-    UnexpectedEOF(),
-    NotAValidExponent(TryFromIntError, i32, usize), //Given exponent <int> at index <char> is not valid
+    #[error("Expected one of {0:?}, found {1}, at character position {2}")]
+    ExpectedCharacter(Vec<&'static str>, char, usize),
+    #[error("parsing ended at character {0}, but the string is not ended ")]
+    ExpectedEOF(usize),
+    #[error("Unexpected EOF (unknown position)")]
+    UnexpectedEOF,
+    #[error("The exponent ({1}) at character position {2} is invalid: {0}")]
+    NotAValidExponent(TryFromIntError, i32, usize),
+    #[error("Expected an integer at character position {1} : {0}")]
     IntegerParsingError(<i32 as std::str::FromStr>::Err, usize),
-    NotAValidJump(),                     //[0,0] is not a valid jump
-    UpperExpLessThanLower(usize, usize), //upper bound <usize_2> in exponent range is less than the lower bound <usize_1>
+    #[error("[0,0] is not a valid jump (Unknown position_")]
+    NotAValidJump,
+    #[error(
+        "Upper bound ({1}) in exponent range is less than lower bound ({0}) (unkown position)"
+    )]
+    UpperExpLessThanLower(usize, usize),
 }
 
 pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
@@ -130,7 +141,7 @@ where
             c,
             idx,
         )),
-        None => Err(ParsingError::UnexpectedEOF()),
+        None => Err(ParsingError::UnexpectedEOF),
     }
 }
 
@@ -140,7 +151,7 @@ where
 {
     let (_, f) = match input.peek() {
         Some((i, f)) => (*i, *f),
-        None => return Err(ParsingError::UnexpectedEOF()),
+        None => return Err(ParsingError::UnexpectedEOF),
     };
     if f == '[' {
         //this is a range
@@ -149,13 +160,13 @@ where
         if !input.take(2).all(|(_, f)| f == '.') {
             let (i, c) = match input.peek() {
                 Some((i, f)) => (i, f),
-                None => return Err(ParsingError::UnexpectedEOF()),
+                None => return Err(ParsingError::UnexpectedEOF),
             };
             return Err(ParsingError::ExpectedCharacter(vec![".."], *c, *i));
         }
         match match input.peek() {
             Some((i, c)) => (*i, *c),
-            None => return Err(ParsingError::UnexpectedEOF()),
+            None => return Err(ParsingError::UnexpectedEOF),
         } {
             (_, '*') => {
                 //infinite range
@@ -163,7 +174,7 @@ where
 
                 match input.next() {
                     Some((_, ']')) => Ok(Mod::ExponentiateInfinite(lower)),
-                    None => Err(ParsingError::UnexpectedEOF()),
+                    None => Err(ParsingError::UnexpectedEOF),
                     Some((idx, c)) => Err(ParsingError::ExpectedCharacter(vec!["]"], c, idx)),
                 }
             }
@@ -186,7 +197,7 @@ where
                 }
                 match input.next() {
                     Some((_, ']')) => Ok(Mod::ExponentiateRange(lower, upper)),
-                    None => Err(ParsingError::UnexpectedEOF()),
+                    None => Err(ParsingError::UnexpectedEOF),
                     Some((idx, c)) => Err(ParsingError::ExpectedCharacter(vec!["]"], c, idx)),
                 }
             }
@@ -214,7 +225,7 @@ where
 {
     let idx = match input.peek() {
         Some((idx, _)) => *idx,
-        None => return Err(ParsingError::UnexpectedEOF()),
+        None => return Err(ParsingError::UnexpectedEOF),
     };
 
     let int: i32 = parse_integer(input)?;
@@ -243,14 +254,14 @@ where
                         match input.next() {
                             Some((_, ',')) => moves.push(parse_seq(input)?),
                             Some((_, '}')) => return Ok(PieceOption::Options(moves)),
-                            None => return Err(ParsingError::UnexpectedEOF()),
+                            None => return Err(ParsingError::UnexpectedEOF),
                             Some((i, c)) => {
                                 return Err(ParsingError::ExpectedCharacter(vec![",", "}"], c, i))
                             }
                         }
                     }
                 }
-                None => Err(ParsingError::UnexpectedEOF()),
+                None => Err(ParsingError::UnexpectedEOF),
             }
         }
         Some((_, '(')) => {
@@ -259,7 +270,7 @@ where
 
             match input.next() {
                 Some((_, ')')) => m.map(|x| PieceOption::Move(Box::new(x))),
-                None => Err(ParsingError::UnexpectedEOF()),
+                None => Err(ParsingError::UnexpectedEOF),
                 Some((idx, c)) => Err(ParsingError::ExpectedCharacter(vec![")"], c, idx)),
             }
         }
@@ -276,26 +287,26 @@ where
 {
     match input.next() {
         Some((_, '[')) => (),
-        None => return Err(ParsingError::UnexpectedEOF()),
+        None => return Err(ParsingError::UnexpectedEOF),
         Some((idx, c)) => return Err(ParsingError::ExpectedCharacter(vec!["["], c, idx)),
     };
 
     let first_int = parse_integer(input)?;
     match input.next() {
         Some((_, ',')) => (),
-        None => return Err(ParsingError::UnexpectedEOF()),
+        None => return Err(ParsingError::UnexpectedEOF),
         Some((idx, c)) => return Err(ParsingError::ExpectedCharacter(vec![","], c, idx)),
     };
 
     let second_int = parse_integer(input)?;
     match input.next() {
         Some((_, ']')) => (),
-        None => return Err(ParsingError::UnexpectedEOF()),
+        None => return Err(ParsingError::UnexpectedEOF),
         Some((idx, c)) => return Err(ParsingError::ExpectedCharacter(vec!["]"], c, idx)),
     };
 
     if first_int == 0 && second_int == 0 {
-        return Err(ParsingError::NotAValidJump());
+        return Err(ParsingError::NotAValidJump);
     }
 
     Ok(Jump {
@@ -310,7 +321,7 @@ where
 {
     let i: usize = match input.peek() {
         Some((i, _)) => *i,
-        _ => return Err(ParsingError::UnexpectedEOF()),
+        _ => return Err(ParsingError::UnexpectedEOF),
     };
 
     let is_negative: bool = match input.peek() {
@@ -330,9 +341,13 @@ where
     if s.is_empty() {
         let (i, c) = match input.peek() {
             Some((i, c)) => (*i, *c),
-            None => return Err(ParsingError::UnexpectedEOF()),
+            None => return Err(ParsingError::UnexpectedEOF),
         };
-        return Err(ParsingError::ExpectedCharacter(vec!["integer"], c, i));
+        return Err(ParsingError::ExpectedCharacter(
+            vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+            c,
+            i,
+        ));
     }
 
     let abs: i32 = match s.parse::<i32>() {
@@ -415,14 +430,14 @@ mod tests {
         let knight = parse_string("[e,1]/|-");
         match knight.err().unwrap() {
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 1),
-            _ => assert!(false),
+            _ => panic!(),
         }
         let knight = parse_string("[2.2,1]/|-");
         assert!(knight.is_err());
         //println!("{:?}",knight);
         match knight.unwrap_err() {
             crate::parser::ParsingError::ExpectedCharacter(_, _, i) => assert_eq!(i, 2), //the decimal point should cause an error
-            _ => assert!(false),
+            _ => panic!(),
         }
     }
 

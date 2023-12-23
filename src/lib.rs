@@ -419,9 +419,9 @@ mod tests {
     impl crate::Board for DetailedTestBoard {
         fn tile_at(&self, position: (i32, i32)) -> crate::TileState {
             if self.grid.contains(&position) {
-                return crate::TileState::Empty;
+                crate::TileState::Empty
             } else {
-                return crate::TileState::Impassable;
+                crate::TileState::Impassable
             }
         }
     }
@@ -450,7 +450,7 @@ mod tests {
 
         //piece should not be able to reach into the island due to blockages
         let invalids: Vec<(i32, i32)> = points
-            .filter(|p| !check_move(piece, board, start_position, *p, false, false).is_some())
+            .filter(|p| check_move(piece, board, start_position, *p, false, false).is_none())
             .collect();
 
         assert_eq!(invalids, vec![(4, 4)])
@@ -467,7 +467,7 @@ mod tests {
 
         let board = &DetailedTestBoard { grid: grid_points };
         //a knight that can optionally make a single hop forwards
-        for s in vec!["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
+        for s in &["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
             //thse two pieces should be the same, just syntactcial sugar
             let k = create_piece(s).unwrap();
             let piece = &MoveGraph::from(k);
@@ -595,33 +595,33 @@ mod tests {
         let start_position = (6, 3);
 
         assert!(check_move(piece, board, start_position, (7, 4), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 4), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 4), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (7, 3), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 3), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 3), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (7, 2), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 2), false, false).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 2), false, false).is_some());
+        assert!(check_move(piece, board, start_position, (6, 4), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (5, 4), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (7, 3), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (6, 3), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (5, 3), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (7, 2), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (6, 2), false, false).is_none());
+        assert!(check_move(piece, board, start_position, (5, 2), false, false).is_none());
 
-        assert!(!check_move(piece, board, start_position, (7, 4), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 4), true, false).is_some());
+        assert!(check_move(piece, board, start_position, (7, 4), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (6, 4), true, false).is_none());
         assert!(check_move(piece, board, start_position, (5, 4), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (7, 3), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 3), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 3), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (7, 2), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 2), true, false).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 2), true, false).is_some());
+        assert!(check_move(piece, board, start_position, (7, 3), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (6, 3), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (5, 3), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (7, 2), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (6, 2), true, false).is_none());
+        assert!(check_move(piece, board, start_position, (5, 2), true, false).is_none());
 
-        assert!(!check_move(piece, board, start_position, (7, 4), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 4), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 4), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (7, 3), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 3), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 3), false, true).is_some());
+        assert!(check_move(piece, board, start_position, (7, 4), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (6, 4), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (5, 4), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (7, 3), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (6, 3), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (5, 3), false, true).is_none());
         assert!(check_move(piece, board, start_position, (7, 2), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (6, 2), false, true).is_some());
-        assert!(!check_move(piece, board, start_position, (5, 2), false, true).is_some());
+        assert!(check_move(piece, board, start_position, (6, 2), false, true).is_none());
+        assert!(check_move(piece, board, start_position, (5, 2), false, true).is_none());
     }
 }

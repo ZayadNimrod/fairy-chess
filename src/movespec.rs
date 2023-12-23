@@ -237,7 +237,7 @@ impl MoveGraph {
             }
             Mod::ExponentiateInfinite(min) => {
                 let (h, t_mid) = self.build_from_mod(mov, &Mod::Exponentiate(*min - 1));
-                let (h_mid, t) = self.build_from_node(&*mov);
+                let (h_mid, t) = self.build_from_node(mov);
                 self.graph.add_edge(t, h_mid, EdgeType::DummyOptional);
                 self.merge(h_mid, t_mid);
                 (h, t)

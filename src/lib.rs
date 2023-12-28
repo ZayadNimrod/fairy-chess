@@ -114,9 +114,8 @@ where
             //we reached the target, check that we don't have further moves to make. If not, we've reached the target tile successfuly!
             if !piece
                 .outgoing_edges(head.current_move)
-                .any(|e| match e.weight() {
-                    movespec::EdgeType::Optional(_) => false,
-                    movespec::EdgeType::Required(_) => true,
+                .any(|e| match e.weight() {                    
+                    movespec::EdgeType::Jump(_) => true,
                     movespec::EdgeType::DummyOptional => false,
                     movespec::EdgeType::DummyRequired => true,
                 })
@@ -149,8 +148,7 @@ where
                 piece
                     .all_outgoing(head.current_move)
                     .filter(|(_, e)| match e.weight() {
-                        movespec::EdgeType::Optional(_) => false,
-                        movespec::EdgeType::Required(_) => false,
+                        movespec::EdgeType::Jump(_) => false,
                         movespec::EdgeType::DummyOptional => true,
                         movespec::EdgeType::DummyRequired => true,
                     })
@@ -168,8 +166,7 @@ where
         .iter()
         .map(|(n, e)| {
             let mut j: Jump = match e.weight() {
-                movespec::EdgeType::Optional(j) => Jump { x: j.x, y: j.y },
-                movespec::EdgeType::Required(j) => Jump { x: j.x, y: j.y },
+                movespec::EdgeType::Jump(j) => Jump { x: j.x, y: j.y },
                 movespec::EdgeType::DummyOptional | movespec::EdgeType::DummyRequired => {
                     return MoveTrace {
                         current_move: *n,
@@ -217,8 +214,7 @@ where
                     //if all outgoing edges are optional or non-dummy (or there are no outgoing edges), stay here. Otherwise, advance!
 
                     if !piece.all_outgoing(hd).any(|(_, e)| match e.weight() {
-                        movespec::EdgeType::Optional(_) => true,
-                        movespec::EdgeType::Required(_) => true,
+                        movespec::EdgeType::Jump(_) => true,
                         movespec::EdgeType::DummyOptional => true,
                         movespec::EdgeType::DummyRequired => false,
                     }) {

@@ -105,8 +105,7 @@ pub struct MoveGraph {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum EdgeType {
-    Optional(Jump),
-    Required(Jump),
+    Jump(Jump),
     DummyOptional,
     DummyRequired,
 }
@@ -152,7 +151,7 @@ impl MoveGraph {
             MoveCompact::Jump(j) => {
                 let h = self.graph.add_node(());
                 let t = self.graph.add_node(());
-                self.graph.add_edge(h, t, EdgeType::Required(*j));
+                self.graph.add_edge(h, t, EdgeType::Jump(*j));
                 (h, t)
             }
             MoveCompact::Choice(choices) => {
@@ -316,8 +315,7 @@ impl MoveGraph {
                         .filter(
                             //filter out non-dummy edges
                             |e| match e.weight() {
-                                EdgeType::Optional(_) => false,
-                                EdgeType::Required(_) => false,
+                                EdgeType::Jump(_) => false,
                                 EdgeType::DummyOptional => false,
                                 EdgeType::DummyRequired => true,
                             },
@@ -364,8 +362,7 @@ impl MoveGraph {
                         if es.len() == 1 {
                             let e = es[0];
                             return match e.weight() {
-                                EdgeType::Optional(_) => None,
-                                EdgeType::Required(_) => None,
+                                EdgeType::Jump(_) => None,
                                 EdgeType::DummyOptional => None,
                                 EdgeType::DummyRequired => Some((e.source(), e.target())),
                             };

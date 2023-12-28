@@ -60,7 +60,7 @@ impl fairy_chess::Board for TestBoard {
 fn knight_t() {
     let board = &TestBoard { x_max: 7, y_max: 7 };
     let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
-    assert!(check_move(k, board, (4, 4), (5, 6)).is_some());
+    assert!(check_move(k, board, (4, 4), (5, 6), false, false).is_some());
 }
 
 fn knight() {
@@ -75,7 +75,7 @@ fn knight() {
         .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
     let valids: Vec<(i32, i32)> = points
-        .filter(|p| check_move(k, board, start_position, *p).is_some())
+        .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(
@@ -105,7 +105,7 @@ fn knight_offset() {
         .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
     let valids: Vec<(i32, i32)> = points
-        .filter(|p| check_move(k, board, start_position, *p).is_some())
+        .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(
@@ -135,7 +135,7 @@ fn knightrider() {
         .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
 
     let valids: Vec<(i32, i32)> = points
-        .filter(|p| check_move(k, board, start_position, *p).is_some())
+        .filter(|p| check_move(k, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(
@@ -197,7 +197,7 @@ fn infinte_king() {
 
     //piece should not be able to reach into the island due to blockages
     let invalids: Vec<(i32, i32)> = points
-        .filter(|p| !check_move(piece, board, start_position, *p).is_some())
+        .filter(|p| !check_move(piece, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(invalids, vec![(4, 4)])
@@ -223,7 +223,7 @@ fn skirmisher() {
             .iter()
             .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
         let valids: Vec<(i32, i32)> = points
-            .filter(|p| check_move(piece, board, start_position, *p).is_some())
+            .filter(|p| check_move(piece, board, start_position, *p, false, false).is_some())
             .collect();
 
         assert_eq!(
@@ -259,7 +259,7 @@ fn blocked_knightrider() {
         .iter()
         .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
     let valids: Vec<(i32, i32)> = points
-        .filter(|p| check_move(piece, board, start_position, *p).is_some())
+        .filter(|p| check_move(piece, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(
@@ -307,7 +307,7 @@ fn convoluted() {
         .iter()
         .flat_map(|x| points_r.iter().map(|y| (*x, *y)));
     let valids: Vec<(i32, i32)> = points
-        .filter(|p| check_move(piece, board, start_position, *p).is_some())
+        .filter(|p| check_move(piece, board, start_position, *p, false, false).is_some())
         .collect();
 
     assert_eq!(valids, vec![(-1, 3), (3, 3), (7, 3), (9, 5), (11, 7)])

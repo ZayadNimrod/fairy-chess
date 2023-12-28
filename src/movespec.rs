@@ -20,7 +20,7 @@ pub enum MoveCompact {
 }
 
 impl MoveCompact {
-    pub fn notation(&self) -> String {
+    pub(crate) fn notation(&self) -> String {
         //TODO: not sure how efficient format!() is, or any of this function really
         match self {
             MoveCompact::Jump(j) => format!("[{},{}]", j.x, j.y),
@@ -93,13 +93,9 @@ impl TryFrom<String> for MoveCompact {
     }
 }
 
-pub struct MoveGraphNode {
-    //jump: Jump,
-}
-
 #[derive(Debug)]
-pub struct MoveGraph {
-    pub graph: petgraph::stable_graph::StableDiGraph<(), EdgeType, DefaultIx>,
+pub struct MoveGraph<Ix: petgraph::adj::IndexType = DefaultIx> {
+    pub graph: petgraph::stable_graph::StableDiGraph<(), EdgeType, Ix>,
     head: NodeIndex<DefaultIx>,
 }
 
@@ -110,20 +106,25 @@ pub enum EdgeType {
     DummyRequired,
 }
 
-//TODO do I want it to consume the MoveCompact? I can't convert back, and MoveCompact is actually serializable, unless we count the string representation- which has to be genrated from MoveCompact anyway!
-//It'll have to though, I think, that's how MoveCompact works, it owns its values...
-impl From<MoveCompact> for MoveGraph {
-    fn from(input: MoveCompact) -> Self {
+impl From<&MoveCompact> for MoveGraph {
+    fn from(input: &MoveCompact) -> Self {
         let mut r = MoveGraph {
             graph: petgraph::stable_graph::StableDiGraph::<(), EdgeType, DefaultIx>::with_capacity(
                 0, 0,
             ),
             head: NodeIndex::<DefaultIx>::default(),
         };
-        let (h, _) = r.build_from_node(&input);
+        let (h, _) = r.build_from_node(input);
         r.head = h;
         r.deflate();
         r
+    }
+}
+
+// Is this actually necessary? Would have thought there'd be a blanket impl From<T> when you have From<&T>
+impl From<MoveCompact> for MoveGraph {
+    fn from(input: MoveCompact) -> Self {
+        (&input).into()
     }
 }
 
@@ -295,6 +296,8 @@ impl MoveGraph {
     pub fn head(&self) -> NodeIndex<DefaultIx> {
         self.head
     }
+
+    //TODO consider deflating by combining identical subgraphs
 
     ///deflate the graph by removing superfluous nodes
     pub fn deflate(&mut self) {

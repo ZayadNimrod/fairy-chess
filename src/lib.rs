@@ -114,7 +114,7 @@ where
             //we reached the target, check that we don't have further moves to make. If not, we've reached the target tile successfuly!
             if !piece
                 .outgoing_edges(head.current_move)
-                .any(|e| match e.weight() {                    
+                .any(|e| match e.weight() {
                     movespec::EdgeType::Jump(_) => true,
                     movespec::EdgeType::DummyOptional => false,
                     movespec::EdgeType::DummyRequired => true,

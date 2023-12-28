@@ -61,7 +61,7 @@ pub enum ParsingError {
     UpperExpLessThanLower(usize, usize),
 }
 
-pub fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
+pub(crate) fn parse_string(input: &str) -> Result<crate::movespec::MoveCompact, ParsingError> {
     //TODO also filter out tabs
     let mut a = input
         .chars()

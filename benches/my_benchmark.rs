@@ -41,7 +41,7 @@ criterion_main!(benches);
 //copied from the tests in the main crate
 use std::vec;
 
-use fairy_chess::{check_move, create_piece, movespec::MoveGraph};
+use fairy_chess::{check_move, create_piece, MoveGraph};
 
 struct TestBoard {
     x_max: i32,

@@ -1,6 +1,5 @@
 use std::iter::Zip;
 
-use petgraph;
 use petgraph::graph::{DefaultIx, NodeIndex};
 use petgraph::stable_graph::EdgeReference;
 use petgraph::visit::{EdgeRef, IntoEdges, IntoNeighbors};

@@ -1,13 +1,12 @@
-pub mod movespec;
+mod movespec;
 mod parser;
 
 use std::rc::Rc;
 
-use movespec::MoveCompact;
-use movespec::MoveGraph;
-use parser::Jump;
 use petgraph::graph::{DefaultIx, NodeIndex};
 use petgraph::stable_graph::EdgeReference;
+
+pub use movespec::{EdgeType, Jump, Mod, MoveCompact, MoveGraph};
 
 #[derive(Debug)]
 pub enum PieceCreationError {

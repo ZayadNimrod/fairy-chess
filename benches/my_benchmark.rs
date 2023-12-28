@@ -1,28 +1,28 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn knight_t_bench(c: &mut Criterion) {
-    c.bench_function("knight_t", |b| b.iter(|| knight_t()));
+    c.bench_function("knight_t", |b| b.iter(knight_t));
 }
 fn knight_bench(c: &mut Criterion) {
-    c.bench_function("knight", |b| b.iter(|| knight()));
+    c.bench_function("knight", |b| b.iter(knight));
 }
 fn knight_offset_bench(c: &mut Criterion) {
-    c.bench_function("knight_offset", |b| b.iter(|| knight_offset()));
+    c.bench_function("knight_offset", |b| b.iter(knight_offset));
 }
 fn knightrider_bench(c: &mut Criterion) {
-    c.bench_function("knightrider", |b| b.iter(|| knightrider()));
+    c.bench_function("knightrider", |b| b.iter(knightrider));
 }
 fn infinte_king_bench(c: &mut Criterion) {
-    c.bench_function("infinte_king", |b| b.iter(|| infinte_king()));
+    c.bench_function("infinte_king", |b| b.iter(infinte_king));
 }
 fn skirmisher_bench(c: &mut Criterion) {
-    c.bench_function("skirmisher", |b| b.iter(|| skirmisher()));
+    c.bench_function("skirmisher", |b| b.iter(skirmisher));
 }
 fn blocked_knightrider_bench(c: &mut Criterion) {
-    c.bench_function("blocked_knightrider", |b| b.iter(|| blocked_knightrider()));
+    c.bench_function("blocked_knightrider", |b| b.iter(blocked_knightrider));
 }
 fn convoluted_bench(c: &mut Criterion) {
-    c.bench_function("convoluted", |b| b.iter(|| convoluted()));
+    c.bench_function("convoluted", |b| b.iter(convoluted));
 }
 
 criterion_group!(
@@ -166,9 +166,9 @@ struct DetailedTestBoard {
 impl fairy_chess::Board for DetailedTestBoard {
     fn tile_at(&self, position: (i32, i32)) -> fairy_chess::TileState {
         if self.grid.contains(&position) {
-            return fairy_chess::TileState::Empty;
+            fairy_chess::TileState::Empty
         } else {
-            return fairy_chess::TileState::Impassable;
+            fairy_chess::TileState::Impassable
         }
     }
 }
@@ -197,7 +197,7 @@ fn infinte_king() {
 
     //piece should not be able to reach into the island due to blockages
     let invalids: Vec<(i32, i32)> = points
-        .filter(|p| !check_move(piece, board, start_position, *p, false, false).is_some())
+        .filter(|p| check_move(piece, board, start_position, *p, false, false).is_none())
         .collect();
 
     assert_eq!(invalids, vec![(4, 4)])
@@ -213,7 +213,7 @@ fn skirmisher() {
 
     let board = &DetailedTestBoard { grid: grid_points };
     //a knight that can optionally make a single hop forwards
-    for s in vec!["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
+    for s in &["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
         //thse two pieces should be the same, just syntactcial sugar
         let k = create_piece(s).unwrap();
         let piece = &MoveGraph::<u32>::from(k);

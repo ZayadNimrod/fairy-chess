@@ -41,7 +41,7 @@ criterion_main!(benches);
 //copied from the tests in the main crate
 use std::vec;
 
-use fairy_chess::{check_move, create_piece, MoveGraph};
+use fairy_chess::{check_move, MoveCompact, MoveGraph};
 
 struct TestBoard {
     x_max: i32,
@@ -59,13 +59,13 @@ impl fairy_chess::Board for TestBoard {
 
 fn knight_t() {
     let board = &TestBoard { x_max: 7, y_max: 7 };
-    let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
+    let k = &MoveGraph::<u32>::from(("[1,2]|-/").parse::<MoveCompact>().unwrap());
     assert!(check_move(k, board, (4, 4), (5, 6), false, false).is_some());
 }
 
 fn knight() {
     let board = &TestBoard { x_max: 7, y_max: 7 };
-    let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
+    let k = &MoveGraph::<u32>::from(("[1,2]|-/").parse::<MoveCompact>().unwrap());
     let start_position = (4, 4);
 
     let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -95,7 +95,7 @@ fn knight() {
 
 fn knight_offset() {
     let board = &TestBoard { x_max: 7, y_max: 7 };
-    let k = &MoveGraph::<u32>::from(create_piece("[1,2]|-/").unwrap());
+    let k = &MoveGraph::<u32>::from(("[1,2]|-/").parse::<MoveCompact>().unwrap());
     let start_position = (1, 1);
 
     let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -125,7 +125,7 @@ fn knight_offset() {
 
 fn knightrider() {
     let board = &TestBoard { x_max: 8, y_max: 8 };
-    let k = &MoveGraph::<u32>::from(create_piece("[1,2]^*|-/").unwrap());
+    let k = &MoveGraph::<u32>::from(("[1,2]^*|-/").parse::<MoveCompact>().unwrap());
     let start_position = (2, 2);
 
     let points_r = (0..=8).collect::<Vec<i32>>();
@@ -189,7 +189,7 @@ fn infinte_king() {
         .collect::<Vec<(i32, i32)>>();
 
     let board = &DetailedTestBoard { grid: grid_points };
-    let piece = &MoveGraph::<u32>::from(create_piece("{[1,0]/,[1,1]}|-^*").unwrap());
+    let piece = &MoveGraph::<u32>::from(("{[1,0]/,[1,1]}|-^*").parse::<MoveCompact>().unwrap());
     let start_position = (1, 1);
     let points = points_r
         .iter()
@@ -215,7 +215,7 @@ fn skirmisher() {
     //a knight that can optionally make a single hop forwards
     for s in &["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
         //thse two pieces should be the same, just syntactcial sugar
-        let k = create_piece(s).unwrap();
+        let k = (s.parse::<MoveCompact>()).unwrap();
         let piece = &MoveGraph::<u32>::from(k);
         let start_position = (1, 1);
 
@@ -242,7 +242,7 @@ fn skirmisher() {
 }
 
 fn blocked_knightrider() {
-    let piece = &MoveGraph::<u32>::from(create_piece("[1,2]^*/|-").unwrap());
+    let piece = &MoveGraph::<u32>::from(("[1,2]^*/|-".parse::<MoveCompact>()).unwrap());
 
     let points_r = (0..=13).collect::<Vec<i32>>();
     let grid_points = points_r
@@ -290,7 +290,8 @@ fn blocked_knightrider() {
 }
 
 fn convoluted() {
-    let piece = &MoveGraph::<u32>::from(create_piece("([2,2]^[2..*]-|/*[0,-4])^*").unwrap());
+    let piece =
+        &MoveGraph::<u32>::from(("([2,2]^[2..*]-|/*[0,-4])^*".parse::<MoveCompact>()).unwrap());
 
     let points_r = (-1..=11).collect::<Vec<i32>>();
     let grid_points = points_r

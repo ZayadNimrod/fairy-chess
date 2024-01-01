@@ -74,7 +74,7 @@ impl<'de> serde::Deserialize<'de> for MoveCompact {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        s.try_into().map_err(serde::de::Error::custom)
+        s.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -84,11 +84,11 @@ impl From<MoveCompact> for String {
     }
 }
 
-impl TryFrom<String> for MoveCompact {
-    type Error = parser::ParsingError;
+impl std::str::FromStr for MoveCompact {
+    type Err = parser::ParsingError;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        parser::parse_string(&value)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parser::parse_string(s)
     }
 }
 
@@ -297,9 +297,10 @@ impl MoveGraph {
     }
 
     //TODO consider deflating by combining identical subgraphs
+    // This can be done by seeing if two nodes have identival successor sets, and if so, merging them
 
     ///deflate the graph by removing superfluous nodes
-    pub fn deflate(&mut self) {
+    fn deflate(&mut self) {
         //TODO this loop is probably not the most efficient way to solve this problem...
         loop {
             //Find a reason to merge nodes

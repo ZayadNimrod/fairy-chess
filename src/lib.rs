@@ -267,19 +267,12 @@ where
     None
 }
 
-pub fn create_piece(s: &str) -> Result<MoveCompact, PieceCreationError> {
-    match parser::parse_string(s) {
-        Ok(o) => Ok(o),
-        Err(e) => Err(PieceCreationError::ParserError(e)),
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     use std::vec;
 
-    use crate::{check_move, create_piece, movespec::MoveGraph};
+    use crate::{check_move, movespec::MoveGraph, MoveCompact};
 
     struct TestBoard {
         x_max: i32,
@@ -302,7 +295,7 @@ mod tests {
     #[test]
     fn knight_t() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
-        let k = &MoveGraph::from(create_piece("[1,2]|-/").unwrap());
+        let k = &MoveGraph::from(("[1,2]|-/".parse::<MoveCompact>()).unwrap());
         let result = check_move(k, board, (4, 4), (5, 6), false, false);
         assert!(result.is_some());
         assert_eq!(result.unwrap(), [(4, 4), (5, 6)])
@@ -311,7 +304,7 @@ mod tests {
     #[test]
     fn knight() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
-        let k = &MoveGraph::from(create_piece("[1,2]|-/").unwrap());
+        let k = &MoveGraph::from(("[1,2]|-/".parse::<MoveCompact>()).unwrap());
         let start_position = (4, 4);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -342,7 +335,7 @@ mod tests {
     #[test]
     fn knight_offset() {
         let board = &TestBoard { x_max: 7, y_max: 7 };
-        let k = &MoveGraph::from(create_piece("[1,2]|-/").unwrap());
+        let k = &MoveGraph::from(("[1,2]|-/".parse::<MoveCompact>()).unwrap());
         let start_position = (1, 1);
 
         let points_r = (-2..=9).collect::<Vec<i32>>();
@@ -373,7 +366,7 @@ mod tests {
     #[test]
     fn knightrider() {
         let board = &TestBoard { x_max: 8, y_max: 8 };
-        let k = &MoveGraph::from(create_piece("[1,2]^*|-/").unwrap());
+        let k = &MoveGraph::from(("[1,2]^*|-/".parse::<MoveCompact>()).unwrap());
         let start_position = (2, 2);
 
         let points_r = (0..=8).collect::<Vec<i32>>();
@@ -437,7 +430,7 @@ mod tests {
             .collect::<Vec<(i32, i32)>>();
 
         let board = &DetailedTestBoard { grid: grid_points };
-        let piece = &MoveGraph::from(create_piece("{[1,0]/,[1,1]}|-^*").unwrap());
+        let piece = &MoveGraph::from(("{[1,0]/,[1,1]}|-^*").parse::<MoveCompact>().unwrap());
         let start_position = (1, 1);
         let points = points_r
             .iter()
@@ -464,7 +457,7 @@ mod tests {
         //a knight that can optionally make a single hop forwards
         for s in &["[1,2]|-/*[0,1]^[0..1]", "[1,2]|-/*[0,1]?"] {
             //thse two pieces should be the same, just syntactcial sugar
-            let k = create_piece(s).unwrap();
+            let k = (s.parse::<MoveCompact>()).unwrap();
             let piece = &MoveGraph::from(k);
             println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
             println!("head:{:?}", piece.head());
@@ -499,7 +492,7 @@ mod tests {
     //a knightrider that is blocked at some points and therefore can't reach subsequent positions
     #[test]
     fn blocked_knightrider() {
-        let piece = &MoveGraph::from(create_piece("[1,2]^*/|-").unwrap());
+        let piece = &MoveGraph::from(("[1,2]^*/|-").parse::<MoveCompact>().unwrap());
 
         let points_r = (0..=13).collect::<Vec<i32>>();
         let grid_points = points_r
@@ -548,7 +541,11 @@ mod tests {
 
     #[test]
     fn convoluted() {
-        let piece = &MoveGraph::from(create_piece("([2,2]^[2..*]-|/*[0,-4])^*").unwrap());
+        let piece = &MoveGraph::from(
+            ("([2,2]^[2..*]-|/*[0,-4])^*")
+                .parse::<MoveCompact>()
+                .unwrap(),
+        );
 
         println!("{:?}", petgraph::dot::Dot::with_config(&piece.graph, &[]));
         println!("head:{:?}", piece.head());
@@ -576,7 +573,7 @@ mod tests {
     }
     #[test]
     fn invert() {
-        let piece = &MoveGraph::from(create_piece("[1,1]").unwrap());
+        let piece = &MoveGraph::from(("[1,1]").parse::<MoveCompact>().unwrap());
 
         let points_r = (-1..=11).collect::<Vec<i32>>();
         let grid_points = points_r
